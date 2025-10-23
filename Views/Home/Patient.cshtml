@@ -1,0 +1,58 @@
+@* File: Views/Home/Patient.cshtml *@
+@{
+    ViewData["Title"] = "Patient Dashboard";
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h3 mb-0">Patient Dashboard</h1>
+  <span class="badge rounded-pill text-bg-primary">Live</span>
+</div>
+
+@await Html.PartialAsync("_TimeRangeBar")
+@await Html.PartialAsync("_MetricsCards")
+
+<div class="row g-3 mt-1">
+  <div class="col-lg-6">
+    @await Html.PartialAsync("_Heatmap")
+
+    <div class="alert alert-warning d-flex align-items-start gap-2 mt-3" id="alertBanner" hidden>
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <div>
+        <div class="fw-semibold">High pressure detected</div>
+        <div class="small">Consider repositioning. This period is flagged for clinician review.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Key Metrics Over Time</div>
+      <div class="card-body">
+        <div class="ratio ratio-16x9">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-lg-7">
+    @await Html.PartialAsync("_CommentsThread")
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header fw-semibold">Session Details</div>
+      <div class="card-body small">
+        <dl class="row mb-0">
+          <dt class="col-5">User</dt><dd class="col-7" id="metaUser">User-001</dd>
+          <dt class="col-5">Current frame</dt><dd class="col-7" id="metaFrame">#---</dd>
+          <dt class="col-5">Timestamp</dt><dd class="col-7" id="metaTs">—</dd>
+          <dt class="col-5">Lower threshold</dt><dd class="col-7"><code id="metaThresh">25</code></dd>
+          <dt class="col-5">PPI window</dt><dd class="col-7">≥ 10 pixels contiguous</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>

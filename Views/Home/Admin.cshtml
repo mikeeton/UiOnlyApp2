@@ -1,0 +1,72 @@
+@* File: Views/Home/Admin.cshtml *@
+@{
+    ViewData["Title"] = "Admin";
+}
+
+<h1 class="h3 mb-3">Admin</h1>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <div class="small text-muted">Manage users: patient, clinician, admin</div>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCreateUser">
+    <i class="bi bi-person-plus me-1"></i>Create user
+  </button>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Group</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tblUsers">
+        <!-- JS populates -->
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Create User Modal -->
+<div class="modal fade" id="modalCreateUser" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" onsubmit="return window.UI.createUser(event);">
+      <div class="modal-header">
+        <h5 class="modal-title">Create user</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="mb-2">
+          <label class="form-label">Full name</label>
+          <input class="form-control" id="newFullName" required />
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-control" id="newEmail" required />
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Role</label>
+          <select class="form-select" id="newRole">
+            <option>patient</option>
+            <option>clinician</option>
+            <option>admin</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Group</label>
+          <input class="form-control" id="newGroup" placeholder="Ward A / B…" />
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Cancel</button>
+        <button class="btn btn-primary" type="submit">Create</button>
+      </div>
+    </form>
+  </div>
+</div>

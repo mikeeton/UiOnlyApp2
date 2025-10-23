@@ -1,0 +1,81 @@
+﻿@* File: Views/Home/Index.cshtml *@
+@{
+    ViewData["Title"] = "Sensore – Pressure Mapping";
+}
+
+<section class="py-5">
+  <div class="row g-5 align-items-center">
+    <div class="col-lg-6">
+      <h1 class="display-5 fw-bold mb-3">
+        Continuous & Automated Pressure Ulcer Prevention
+      </h1>
+
+      <p class="lead mb-4">
+        Real-time e-textile pressure mapping with smart alert analysis.
+        Explore the patient, clinician, and admin dashboards to see how
+        Sensore helps monitor, detect, and respond to pressure risks
+        before they develop into ulcers.
+      </p>
+
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-primary btn-lg" asp-action="Patient">
+          <i class="bi bi-person me-1"></i> Patient Dashboard
+        </a>
+        <a class="btn btn-outline-secondary btn-lg" asp-action="Clinician">
+          <i class="bi bi-heart-pulse me-1"></i> Clinician Dashboard
+        </a>
+        <a class="btn btn-outline-secondary btn-lg" asp-action="Admin">
+          <i class="bi bi-gear me-1"></i> Admin Dashboard
+        </a>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="ratio ratio-16x9 rounded-4 shadow-sm hero-slab">
+        <div class="p-4 d-flex flex-column justify-content-center align-items-center text-center">
+          <div class="fs-1">🟪🟥🟧🟨</div>
+          <div class="mt-3 fw-semibold">Heatmap · Alerts · Trends · Comments</div>
+          <div class="small text-muted">Front-End UI Demo</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="py-4">
+  <h2 class="h4 mb-3">Key Capabilities</h2>
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="card p-3 feature">
+        <i class="bi bi-activity fs-3 mb-2"></i>
+        <h3 class="h6">Real-time Heatmap</h3>
+        <p class="mb-0">
+          32×32 frames visualized live with color-coded pixel intensity,
+          giving immediate insight into patient positioning.
+        </p>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card p-3 feature">
+        <i class="bi bi-bell fs-3 mb-2"></i>
+        <h3 class="h6">Smart Alerts</h3>
+        <p class="mb-0">
+          Highlights sustained high-pressure regions and notifies clinicians
+          when repositioning is required.
+        </p>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card p-3 feature">
+        <i class="bi bi-graph-up fs-3 mb-2"></i>
+        <h3 class="h6">Trends & Reports</h3>
+        <p class="mb-0">
+          View Peak Pressure Index, Contact Area %, and other metrics across
+          time ranges for data-driven decisions.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>

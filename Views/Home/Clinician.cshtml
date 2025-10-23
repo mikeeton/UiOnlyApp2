@@ -1,0 +1,68 @@
+@* File: Views/Home/Clinician.cshtml *@
+@{
+    ViewData["Title"] = "Clinician Dashboard";
+}
+
+<h1 class="h3 mb-3">Clinician Dashboard</h1>
+
+<div class="card mb-3">
+  <div class="card-body d-flex flex-wrap gap-3 align-items-end">
+    <div>
+      <label class="form-label">Patient</label>
+      <select class="form-select" id="selPatient" style="min-width:220px"></select>
+    </div>
+
+    <div>
+      <label class="form-label">Group</label>
+      <select class="form-select" id="selGroup">
+        <option value="all">All</option>
+        <option value="ward-a">Ward A</option>
+        <option value="ward-b">Ward B</option>
+      </select>
+    </div>
+
+    <div class="ms-auto" style="min-width:320px">
+      <label class="form-label">Time Range</label>
+      <div>@await Html.PartialAsync("_TimeRangeBar")</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    @await Html.PartialAsync("_Heatmap")
+
+    <div class="card mt-3">
+      <div class="card-header fw-semibold">Patient Trends</div>
+      <div class="card-body">
+        <div class="ratio ratio-16x9">
+          <canvas id="clinTrendChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header fw-semibold">Flagged Events</div>
+      <div class="list-group list-group-flush small" id="flagList">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header fw-semibold">Thread (Selected Timestamp)</div>
+      <div class="card-body small" id="clinThread">
+        <!-- Read/reply UI populated by JS -->
+      </div>
+      <div class="card-footer">
+        <form class="d-flex gap-2" onsubmit="return window.UI.replyClinician(event);">
+          <input class="form-control" id="clinReply" placeholder="Reply to thread…" />
+          <button class="btn btn-primary" type="submit">
+            <i class="bi bi-reply-fill"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

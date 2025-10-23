@@ -1,0 +1,52 @@
+@* --- _Heatmap.cshtml : Sensor visualization panel --- *@
+<div class="card heatmap-card shadow-sm">
+    <div class="card-header fw-semibold">
+        <i class="bi bi-grid-3x3-gap-fill text-primary me-2"></i>Pressure Map
+        <div class="ms-auto">
+            <select id="paletteSelect" class="form-select form-select-sm">
+                <option value="default">Default Palette</option>
+                <option value="warm">Warm Gradient</option>
+                <option value="cool">Cool Gradient</option>
+                <option value="contrast">High Contrast</option>
+            </select>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="heatmap-wrap ratio ratio-1x1">
+            <canvas id="heatmapCanvas"></canvas>
+        </div>
+    </div>
+    <div class="card-footer small text-muted text-center">
+        Updated <span id="heatmapTimestamp">just now</span>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // --- Demo Heatmap rendering (mock data) ---
+        document.addEventListener("DOMContentLoaded", () => {
+            const canvas = document.getElementById("heatmapCanvas");
+            const ctx = canvas.getContext("2d");
+            const w = canvas.width = 256;
+            const h = canvas.height = 256;
+
+            const gradient = ctx.createLinearGradient(0, 0, w, h);
+            gradient.addColorStop(0, "#1e3a8a");
+            gradient.addColorStop(0.3, "#3b82f6");
+            gradient.addColorStop(0.6, "#facc15");
+            gradient.addColorStop(1, "#ef4444");
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, w, h);
+
+            // Draw soft circular zone (demo hotspot)
+            const g = ctx.createRadialGradient(150, 120, 20, 150, 120, 80);
+            g.addColorStop(0, "rgba(255, 100, 0, 0.8)");
+            g.addColorStop(1, "rgba(255, 255, 255, 0)");
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(150, 120, 80, 0, 2 * Math.PI);
+            ctx.fill();
+        });
+    </script>
+}

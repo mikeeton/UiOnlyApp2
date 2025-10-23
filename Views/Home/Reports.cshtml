@@ -1,0 +1,126 @@
+@* File: Views/Home/Reports.cshtml *@
+@{
+    ViewData["Title"] = "Reports";
+}
+
+@* File: Views/Home/Reports.cshtml *@
+@{
+    ViewData["Title"] = "Reports";
+}
+
+<section class="reports-container">
+  <h1 class="page-title">Reports</h1>
+
+  <!-- Filters / Controls -->
+  <form class="report-filters" onsubmit="return window.UI.generateReport(event);">
+    <div>
+      <label for="repPatient" class="form-label">Patient</label>
+      <select id="repPatient" required>
+        <option value="" disabled selected>Select patient…</option>
+        @* Populated by site.js on load *@
+      </select>
+    </div>
+
+    <div>
+      <label for="repRange" class="form-label">Time Range</label>
+      <select id="repRange">
+        <option value="24h">Last 24 hours</option>
+        <option value="7d">Last 7 days</option>
+        <option value="30d">Last 30 days</option>
+        <option value="custom">Custom range…</option>
+      </select>
+    </div>
+
+    <div class="d-flex align-items-end justify-content-end">
+      <button class="btn btn-primary" type="submit">
+        <i class="bi bi-file-earmark-bar-graph me-1"></i> Generate
+      </button>
+    </div>
+
+    <!-- Custom range row (shows only when 'custom' selected) -->
+    <div id="customRangeFields" class="d-flex gap-2" hidden style="grid-column: 1 / -1;">
+      <div>
+        <label for="repStart" class="form-label">Start</label>
+        <input id="repStart" type="date" />
+      </div>
+      <div>
+        <label for="repEnd" class="form-label">End</label>
+        <input id="repEnd" type="date" />
+      </div>
+    </div>
+  </form>
+
+  <!-- Top Summary KPIs -->
+  <div class="report-grid" id="repSummary">
+    <div class="kpi-card">
+      <div class="kpi-title">Peak PPI</div>
+      <div class="kpi-value" id="repPeak">—</div>
+      <div class="kpi-trend">Highest recorded in range</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Average PPI</div>
+      <div class="kpi-value" id="repAvg">—</div>
+      <div class="kpi-trend">Mean value across frames</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Contact Area %</div>
+      <div class="kpi-value" id="repContact">—</div>
+      <div class="kpi-trend">Pixels ≥ lower threshold</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Alerts</div>
+      <div class="kpi-value" id="repAlerts">0</div>
+      <div class="kpi-trend">Flagged periods</div>
+    </div>
+  </div>
+
+  <!-- Preview Card -->
+  <div class="report-preview mt-2">
+    <div class="report-preview-header">
+      <h2>Report Preview</h2>
+      <div class="actions">
+        <button type="button" class="btn-export" onclick="window.UI.exportReport('pdf')">
+          <i class="bi bi-filetype-pdf"></i> PDF
+        </button>
+        <button type="button" class="btn-export" onclick="window.UI.exportReport('csv')">
+          <i class="bi bi-filetype-csv"></i> CSV
+        </button>
+      </div>
+    </div>
+
+    <div class="chart-box">
+      <canvas id="reportChart"></canvas>
+      @* If desired, show an empty-state hint until data renders:
+         <div class="empty-state">Generate a report to see charts here</div> *@
+    </div>
+
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Peak PPI</th>
+          <th>Contact %</th>
+          <th>Alerts</th>
+        </tr>
+      </thead>
+      <tbody id="tblReport">
+        @* Populated by site.js (populateReport) *@
+      </tbody>
+    </table>
+  </div>
+</section>
+
+@section Scripts {
+<script>
+  // Toggle custom date inputs when "Custom range" is selected
+  (function () {
+    const sel = document.getElementById('repRange');
+    const block = document.getElementById('customRangeFields');
+    if (!sel || !block) return;
+    block.hidden = sel.value !== 'custom';
+    sel.addEventListener('change', () => {
+      block.hidden = sel.value !== 'custom';
+    });
+  })();
+</script>
+}

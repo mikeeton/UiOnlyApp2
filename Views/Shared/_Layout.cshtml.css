@@ -1,0 +1,43 @@
+﻿/* _Layout.cshtml.css — layout polish for GrapheneTrace */
+
+body {
+    background: radial-gradient(1200px 600px at 10% -10%, #121729 0%, transparent 60%), radial-gradient(900px 600px at 90% -20%, #0f1423 0%, transparent 55%), #0b0e14;
+    color: #e8ecf4;
+    font-family: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.navbar {
+    backdrop-filter: blur(10px);
+    background: rgba(16, 20, 33, 0.72) !important;
+    border-bottom: 1px solid #242b3d;
+}
+
+    .navbar .navbar-brand {
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        color: #fff;
+    }
+
+    .navbar .nav-link {
+        color: #cfd4e6;
+        position: relative;
+        transition: color 0.2s;
+    }
+
+        .navbar .nav-link.active::after {
+            content: "";
+            position: absolute;
+            left: 10%;
+            right: 10%;
+            bottom: -11px;
+            height: 2px;
+            background: linear-gradient(90deg, #5b7cfa, #4de2c2);
+            border-radius: 2px;
+        }
+
+footer {
+    color: #96a2bf;
+    border-top: 1px solid #242b3d;
+    margin-top: 3rem;
+    padding-top: 1rem;
+}

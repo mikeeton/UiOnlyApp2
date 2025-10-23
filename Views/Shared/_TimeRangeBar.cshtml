@@ -1,0 +1,16 @@
+@* File: Views/Shared/_TimeRangeBar.cshtml *@
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+  <div class="btn-group" role="group" aria-label="Time ranges">
+    <button type="button" class="btn btn-outline-secondary btn-sm js-range" data-range="1h">Last 1h</button>
+    <button type="button" class="btn btn-outline-secondary btn-sm js-range" data-range="6h">Last 6h</button>
+    <button type="button" class="btn btn-outline-secondary btn-sm js-range" data-range="24h">Last 24h</button>
+    <button type="button" class="btn btn-outline-secondary btn-sm js-range" data-range="7d">Last 7d</button>
+  </div>
+  <div class="ms-auto small text-muted">Timeline</div>
+</div>
+
+<input type="range" class="form-range" min="0" max="100" value="100" id="timelineRange" />
+<div class="d-flex justify-content-between small text-muted">
+  <span id="timelineStart">T-0</span>
+  <span id="timelineNow">Now</span>
+</div>

@@ -1,0 +1,676 @@
+@{
+    ViewData["Title"] = "Admin Dashboard";
+    Layout = "_Layout";
+}
+
+<div class="container py-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-gear-wide-connected fs-3 text-warning me-2"></i>
+            <h2 class="fw-semibold mb-0">Admin Console</h2>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCreateUser">
+                <i class="bi bi-person-plus me-1"></i> New User
+            </button>
+            <button id="btnExportUsers" class="btn btn-outline-primary">
+                <i class="bi bi-download me-1"></i> Export Users
+            </button>
+        </div>
+    </div>
+
+    <!-- Global Stats -->
+    <section class="row g-3 mb-4">
+        <div class="col-md-3 col-6">
+            <div class="card kpi p-3">
+                <div class="kpi-label">Patients Monitored</div>
+                <div id="kpiPatients" class="kpi-value">—</div>
+                <div class="kpi-subtext">active this week</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card kpi p-3">
+                <div class="kpi-label">Clinicians</div>
+                <div id="kpiClinicians" class="kpi-value">—</div>
+                <div class="kpi-subtext">assigned</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card kpi p-3">
+                <div class="kpi-label">Alerts / Day</div>
+                <div id="kpiAlertsDay" class="kpi-value">—</div>
+                <div class="kpi-subtext">avg last 7 days</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card kpi p-3">
+                <div class="kpi-label">Storage Used</div>
+                <div id="kpiStorage" class="kpi-value">—</div>
+                <div class="kpi-subtext">CSV datasets</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Users & Access -->
+    <div class="card mb-4">
+        <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+            <span><i class="bi bi-people text-primary me-2"></i>User Management</span>
+            <div class="d-flex gap-2">
+                <input id="searchUsers" class="form-control form-control-sm" placeholder="Search users..." style="width:220px" />
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table mb-0" id="tblUsers">
+                <thead>
+                    <tr>
+                        <th style="width:40px"></th>
+                        <th>Name / Email</th>
+                        <th>Role</th>
+                        <th>Assigned</th>
+                        <th>Status</th>
+                        <th style="width:155px">Actions</th>
+                    </tr>
+                </thead>
+                <tbody><!-- JS renders --></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Assignments & Access Control -->
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header fw-semibold">
+                    <i class="bi bi-diagram-3 text-primary me-2"></i>Assign Patients to Clinicians
+                </div>
+                <div class="card-body">
+                    <form id="assignForm" class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Clinician</label>
+                            <select id="selAssignClinician" class="form-select"></select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Patient</label>
+                            <select id="selAssignPatient" class="form-select"></select>
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-primary" type="submit">
+                                <i class="bi bi-link-45deg me-1"></i>Assign
+                            </button>
+                        </div>
+                    </form>
+                    <hr />
+                    <div class="small text-muted">Tip: You can also remove assignments from the user table.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header fw-semibold">
+                    <i class="bi bi-shield-lock text-primary me-2"></i>Access Control / Permissions
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Group Access</label>
+                            <select id="selAccessGroup" class="form-select">
+                                <option>Ward A</option>
+                                <option>Ward B</option>
+                                <option>ICU</option>
+                            </select>
+                            <div class="form-text">Clinician group a user can see.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Permissions</label>
+                            <div class="form-check">
+                                <input class="form-check-input" id="permDownload" type="checkbox" checked>
+                                <label for="permDownload" class="form-check-label">Allow data export</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" id="permEdit" type="checkbox" checked>
+                                <label for="permEdit" class="form-check-label">Allow editing assignments</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button id="btnApplyAccess" class="btn btn-outline-primary">
+                            <i class="bi bi-check2-circle me-1"></i>Apply to Selected User
+                        </button>
+                        <span class="small text-muted ms-2">(select a user row first)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Monitoring -->
+    <div class="row g-4 mt-1">
+        <div class="col-lg-6">
+            <div class="card p-3">
+                <div class="card-header fw-semibold">
+                    <i class="bi bi-activity text-primary me-2"></i>Activity & Logs
+                </div>
+                <div class="ratio ratio-21x9"><canvas id="chartAlerts"></canvas></div>
+                <div class="mt-3 table-responsive">
+                    <table class="table table-hover" id="tblLogs">
+                        <thead><tr><th>Time</th><th>User</th><th>Event</th></tr></thead>
+                        <tbody><!-- JS renders --></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Management -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+                    <span><i class="bi bi-hdd-network text-primary me-2"></i>Data Management</span>
+                    <button id="btnArchive" class="btn btn-outline-primary btn-sm"><i class="bi bi-archive me-1"></i>Archive</button>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Import CSV from Sensore</label>
+                        <div id="dropZone" class="p-4 border rounded-4 text-center" style="border-color:#28324d;">
+                            <i class="bi bi-filetype-csv fs-1 d-block mb-2"></i>
+                            <div class="mb-2">Drag & drop CSV files here, or click to browse</div>
+                            <input id="fileCsv" type="file" accept=".csv" multiple hidden />
+                            <button id="btnBrowse" class="btn btn-outline-primary btn-sm">Browse</button>
+                        </div>
+                        <div id="importList" class="small text-muted mt-2">No files selected.</div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Default Patient</label>
+                            <select id="selImportPatient" class="form-select"></select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Time Ordering</label>
+                            <select id="selTimeOrder" class="form-select">
+                                <option value="auto">Auto-detect</option>
+                                <option value="asc">Ascending</option>
+                                <option value="desc">Descending</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3 d-flex gap-2">
+                        <button id="btnImport" class="btn btn-primary">
+                            <i class="bi bi-upload me-1"></i>Import
+                        </button>
+                        <button id="btnValidate" class="btn btn-outline-primary">
+                            <i class="bi bi-search me-1"></i>Validate
+                        </button>
+                    </div>
+                    <div id="importStatus" class="small text-muted mt-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings & Thresholds + Appointments -->
+    <div class="row g-4 mt-1">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header fw-semibold">
+                    <i class="bi bi-sliders text-primary me-2"></i>System Settings & Thresholds
+                </div>
+                <div class="card-body">
+                    <form id="settingsForm" class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Default Pressure Limit (mmHg)</label>
+                            <input id="setLimit" type="number" class="form-control" value="100" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Alert Cooldown (min)</label>
+                            <input id="setCooldown" type="number" class="form-control" value="10" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Retention (months)</label>
+                            <input id="setRetention" type="number" class="form-control" value="12" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Allow Patient Exports</label><br />
+                            <div class="form-check form-switch">
+                                <input id="setAllowExport" class="form-check-input" type="checkbox" checked>
+                                <label for="setAllowExport" class="form-check-label">Enabled</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i>Save Settings</button>
+                            <span id="settingsSaved" class="small text-success ms-2 d-none">Saved ✓</span>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Appointments -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+                    <span><i class="bi bi-calendar-event text-primary me-2"></i>Appointments</span>
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalAppointment">
+                        <i class="bi bi-plus-lg me-1"></i>New
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table mb-0" id="tblAppointments">
+                        <thead><tr><th>Date</th><th>Time</th><th>Patient</th><th>Clinician</th><th>Notes</th><th style="width:48px"></th></tr></thead>
+                        <tbody><!-- JS renders --></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit User Modal -->
+<div class="modal fade" id="modalCreateUser" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="userForm">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-semibold" id="userModalTitle">Create User</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Full Name</label>
+                        <input id="uName" type="text" class="form-control" required />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Email</label>
+                        <input id="uEmail" type="email" class="form-control" required />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Role</label>
+                        <select id="uRole" class="form-select">
+                            <option>Patient</option>
+                            <option>Clinician</option>
+                            <option>Admin</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Status</label>
+                        <select id="uStatus" class="form-select">
+                            <option>Active</option>
+                            <option>Inactive</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Password (demo)</label>
+                        <input id="uPassword" type="text" class="form-control" placeholder="e.g. 12345" />
+                        <div class="form-text">Passwords are simulated in this demo.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btnUserDelete" type="button" class="btn btn-outline-danger d-none">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i>Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Appointment Modal -->
+<div class="modal fade" id="modalAppointment" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="apptForm">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-semibold">New Appointment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Date</label>
+                        <input id="apptDate" type="date" class="form-control" required />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Time</label>
+                        <input id="apptTime" type="time" class="form-control" required />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Patient</label>
+                        <select id="apptPatient" class="form-select"></select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Clinician</label>
+                        <select id="apptClinician" class="form-select"></select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Notes</label>
+                        <input id="apptNotes" type="text" class="form-control" placeholder="Reason / focus" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1"></i>Add</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        /* ============================
+           DEMO DATA (in-memory)
+           ============================ */
+        let users = [
+          { id:'u1', name:'Michael Brown', email:'michael@demo.com', role:'Patient',  status:'Active',  assignedTo:null, groups:['Ward A'] },
+          { id:'u2', name:'Anna Lewis',    email:'anna@demo.com',    role:'Patient',  status:'Active',  assignedTo:'u4', groups:['Ward A'] },
+          { id:'u3', name:'James Hart',    email:'james@demo.com',   role:'Patient',  status:'Inactive',assignedTo:'u4', groups:['Ward B'] },
+          { id:'u4', name:'Dr. Rivera',    email:'rivera@demo.com',  role:'Clinician',status:'Active',  assigned:['u2','u3'], groups:['Ward A','Ward B'] },
+          { id:'u5', name:'Admin Demo',    email:'admin@demo.com',   role:'Admin',    status:'Active',  assigned:[], groups:['ICU'] }
+        ];
+
+        let logs = [
+          { t:'09:40', user:'admin@demo.com', event:'Login' },
+          { t:'09:35', user:'rivera@demo.com', event:'Viewed patient trends' },
+          { t:'09:10', user:'michael@demo.com', event:'Uploaded CSV' },
+        ];
+
+        let appointments = [
+          { id:'a1', date: new Date().toISOString().slice(0,10), time:'10:30', patient:'Michael Brown', clinician:'Dr. Rivera', notes:'Follow-up review' }
+        ];
+
+        let selectedUserId = null;
+        let editUserId = null;
+        let selectedFiles = [];
+
+        /* ============================
+           HELPERS
+           ============================ */
+        const $ = sel => document.querySelector(sel);
+        const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+        function roleBadge(role){
+          const map = { Patient:'patient', Clinician:'clinician', Admin:'admin' };
+          return `<span class="badge">${(map[role]||role).toLowerCase()}</span>`;
+        }
+        function statusPill(s){ return s==='Active' ? '<span class="text-success">Active</span>' : '<span class="text-warning">Inactive</span>'; }
+        function csvEscape(s){ return (`${s}`).replace(/"/g,'""'); }
+
+        /* ============================
+           USERS TABLE
+           ============================ */
+        function renderUsers(){
+          const q = ($('#searchUsers').value||'').toLowerCase();
+          const tbody = $('#tblUsers tbody'); tbody.innerHTML = '';
+          users.filter(u=>!q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+               .forEach(u=>{
+                const tr = document.createElement('tr');
+                tr.className = selectedUserId===u.id?'table-active':'';
+                const assigned = u.role==='Clinician' ? (u.assigned?.length||0) + ' patients' :
+                                 (u.assignedTo ? 'Clinician' : '-');
+                tr.innerHTML = `
+                  <td><input type="radio" name="uSel" ${selectedUserId===u.id?'checked':''}/></td>
+                  <td><div class="fw-semibold">${u.name}</div><div class="small text-muted">${u.email}</div></td>
+                  <td>${roleBadge(u.role)}</td>
+                  <td>${assigned}</td>
+                  <td>${statusPill(u.status)}</td>
+                  <td class="d-flex gap-1">
+                    <button class="btn btn-outline-primary btn-sm" title="Edit"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-outline-danger btn-sm" title="Delete"><i class="bi bi-trash"></i></button>
+                    <button class="btn btn-outline-secondary btn-sm" title="Reset Password"><i class="bi bi-key"></i></button>
+                  </td>`;
+                // events
+                tr.querySelector('input[type="radio"]').addEventListener('change',()=>{ selectedUserId = u.id; renderUsers(); });
+                tr.querySelector('.btn-outline-primary').addEventListener('click',()=>openEditUser(u.id));
+                tr.querySelector('.btn-outline-danger').addEventListener('click',()=>deleteUser(u.id));
+                tr.querySelector('.btn-outline-secondary').addEventListener('click',()=>resetPassword(u.id));
+                tbody.appendChild(tr);
+               });
+          // update KPIs
+          $('#kpiPatients').innerText = users.filter(u=>u.role==='Patient').length;
+          $('#kpiClinicians').innerText = users.filter(u=>u.role==='Clinician').length;
+        }
+
+        function openEditUser(id){
+          const u = users.find(x=>x.id===id); if(!u) return;
+          editUserId = id;
+          $('#userModalTitle').textContent = 'Edit User';
+          $('#uName').value = u.name;
+          $('#uEmail').value = u.email;
+          $('#uRole').value = u.role;
+          $('#uStatus').value = u.status;
+          $('#uPassword').value = '';
+          $('#btnUserDelete').classList.remove('d-none');
+          new bootstrap.Modal('#modalCreateUser').show();
+        }
+
+        function deleteUser(id){
+          if(!confirm('Delete this user?')) return;
+          users = users.filter(u=>u.id!==id);
+          if(selectedUserId===id) selectedUserId = null;
+          renderUsers(); hydrateSelectors();
+        }
+
+        function resetPassword(id){
+          const u = users.find(x=>x.id===id);
+          if(!u) return;
+          alert(`Password reset link sent to: ${u.email} (demo).`);
+        }
+
+        /* ============================
+           CREATE / UPDATE USER
+           ============================ */
+        $('#userForm').addEventListener('submit', e=>{
+          e.preventDefault();
+          const u = {
+            name: $('#uName').value.trim(),
+            email: $('#uEmail').value.trim(),
+            role: $('#uRole').value,
+            status: $('#uStatus').value
+          };
+          if(editUserId){
+            const idx = users.findIndex(x=>x.id===editUserId);
+            users[idx] = { ...users[idx], ...u };
+          }else{
+            const id = 'u'+(Math.random()*1e6|0);
+            users.push({ id, ...u, assigned:[], assignedTo:null, groups:[] });
+          }
+          editUserId = null;
+          $('#btnUserDelete').classList.add('d-none');
+          bootstrap.Modal.getInstance($('#modalCreateUser')).hide();
+          renderUsers(); hydrateSelectors();
+        });
+        $('#btnUserDelete').addEventListener('click', ()=>{
+          if(!editUserId) return;
+          deleteUser(editUserId);
+          bootstrap.Modal.getInstance($('#modalCreateUser')).hide();
+        });
+
+        /* ============================
+           ASSIGNMENTS
+           ============================ */
+        function hydrateSelectors(){
+          const clSel = $('#selAssignClinician'); const ptSel = $('#selAssignPatient');
+          const apCl = $('#apptClinician'); const apPt = $('#apptPatient'); const imPt = $('#selImportPatient');
+
+          const clinicians = users.filter(u=>u.role==='Clinician' && u.status==='Active');
+          const patients   = users.filter(u=>u.role==='Patient');
+
+          function fill(sel, arr, label){ sel.innerHTML = arr.map(x=>`<option value="${x.id||x.name}">${x.name||x}</option>`).join(''); }
+          fill(clSel, clinicians); fill(ptSel, patients);
+          // appointments use names (for readable table)
+          apCl.innerHTML = clinicians.map(x=>`<option value="${x.name}">${x.name}</option>`).join('');
+          apPt.innerHTML = patients.map(x=>`<option value="${x.name}">${x.name}</option>`).join('');
+          imPt.innerHTML = patients.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');
+        }
+
+        $('#assignForm').addEventListener('submit', e=>{
+          e.preventDefault();
+          const clId = $('#selAssignClinician').value;
+          const ptId = $('#selAssignPatient').value;
+          const cl = users.find(u=>u.id===clId);
+          const pt = users.find(u=>u.id===ptId);
+          if(!cl || !pt) return;
+          cl.assigned = cl.assigned || [];
+          if(!cl.assigned.includes(ptId)) cl.assigned.push(ptId);
+          pt.assignedTo = clId;
+          logs.unshift({ t:new Date().toLocaleTimeString(), user:'admin@demo.com', event:`Assigned ${pt.name} → ${cl.name}` });
+          renderUsers(); renderLogs();
+        });
+
+        /* ============================
+           ACCESS CONTROL
+           ============================ */
+        $('#btnApplyAccess').addEventListener('click', ()=>{
+          if(!selectedUserId){ alert('Select a user first.'); return; }
+          const u = users.find(x=>x.id===selectedUserId);
+          const group = $('#selAccessGroup').value;
+          const allowExport = $('#permDownload').checked;
+          const allowEdit = $('#permEdit').checked;
+          u.groups = [group];
+          u.allowExport = allowExport;
+          u.allowEdit = allowEdit;
+          logs.unshift({ t:new Date().toLocaleTimeString(), user:'admin@demo.com', event:`Updated access for ${u.email}` });
+          renderLogs();
+          alert('Permissions applied (demo).');
+        });
+
+        /* ============================
+           LOGS & MONITORING
+           ============================ */
+        function renderLogs(){
+          const tbody = $('#tblLogs tbody'); tbody.innerHTML = '';
+          logs.slice(0,10).forEach(l=>{
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${l.t}</td><td>${l.user}</td><td>${l.event}</td>`;
+            tbody.appendChild(tr);
+          });
+        }
+        function buildMonitoringCharts(){
+          const ctx = document.getElementById('chartAlerts').getContext('2d');
+          const last7 = ['-6d','-5d','-4d','-3d','-2d','-1d','Today'];
+          const counts = [8,12,9,14,11,10,13];
+          new Chart(ctx, {
+            type:'bar',
+            data:{
+              labels:last7,
+              datasets:[{ label:'Alerts/day', data:counts, backgroundColor:'rgba(91,124,250,.55)', borderRadius:8 }]
+            },
+            options:{
+              plugins:{ legend:{ display:false }},
+              scales:{ x:{ grid:{ color:getComputedStyle(document.documentElement).getPropertyValue('--chart-grid')} },
+                       y:{ grid:{ color:getComputedStyle(document.documentElement).getPropertyValue('--chart-grid')} } }
+            }
+          });
+          // KPIs
+          $('#kpiAlertsDay').innerText = Math.round(counts.reduce((a,b)=>a+b,0)/counts.length);
+          $('#kpiStorage').innerText = '3.1 GB';
+        }
+
+        /* ============================
+           IMPORT CSV (front-end demo)
+           ============================ */
+        const dz = $('#dropZone'); const fileInput = $('#fileCsv');
+        $('#btnBrowse').addEventListener('click', ()=> fileInput.click());
+        fileInput.addEventListener('change', e=> handleFiles(e.target.files));
+        dz.addEventListener('click', ()=> fileInput.click());
+        dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('border-primary'); });
+        dz.addEventListener('dragleave', ()=> dz.classList.remove('border-primary'));
+        dz.addEventListener('drop', e=>{ e.preventDefault(); dz.classList.remove('border-primary'); handleFiles(e.dataTransfer.files); });
+
+        function handleFiles(files){
+          selectedFiles = Array.from(files);
+          $('#importList').textContent = selectedFiles.length ? selectedFiles.map(f=>f.name).join(', ') : 'No files selected.';
+        }
+        $('#btnValidate').addEventListener('click', ()=>{
+          if(!selectedFiles.length) return $('#importStatus').textContent = 'Select CSV files first.';
+          $('#importStatus').textContent = 'Validation passed (demo). Files ready to import.';
+        });
+        $('#btnImport').addEventListener('click', ()=>{
+          if(!selectedFiles.length) return $('#importStatus').textContent = 'Select CSV files first.';
+          const patientId = $('#selImportPatient').value;
+          const order = $('#selTimeOrder').value;
+          $('#importStatus').textContent = `Imported ${selectedFiles.length} file(s) for patient ${patientId} (order: ${order}).`;
+          logs.unshift({ t:new Date().toLocaleTimeString(), user:'admin@demo.com', event:`Imported ${selectedFiles.length} CSV file(s)` });
+          renderLogs();
+        });
+
+        /* ============================
+           SETTINGS
+           ============================ */
+        const LS_KEY = 'admin.settings';
+        function loadSettings(){
+          const s = JSON.parse(localStorage.getItem(LS_KEY)||'{}');
+          if(s.limit) $('#setLimit').value = s.limit;
+          if(s.cooldown) $('#setCooldown').value = s.cooldown;
+          if(s.retention) $('#setRetention').value = s.retention;
+          if(typeof s.allowExport==='boolean') $('#setAllowExport').checked = s.allowExport;
+        }
+        $('#settingsForm').addEventListener('submit', e=>{
+          e.preventDefault();
+          const s = {
+            limit: +$('#setLimit').value,
+            cooldown: +$('#setCooldown').value,
+            retention: +$('#setRetention').value,
+            allowExport: $('#setAllowExport').checked
+          };
+          localStorage.setItem(LS_KEY, JSON.stringify(s));
+          $('#settingsSaved').classList.remove('d-none');
+          setTimeout(()=> $('#settingsSaved').classList.add('d-none'), 1500);
+        });
+
+        /* ============================
+           APPOINTMENTS
+           ============================ */
+        function renderAppointments(){
+          const tbody = $('#tblAppointments tbody'); tbody.innerHTML = '';
+          appointments.forEach(a=>{
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${a.date}</td><td>${a.time}</td><td>${a.patient}</td>
+              <td>${a.clinician}</td><td>${a.notes||''}</td>
+              <td><button class="btn btn-outline-danger btn-sm" title="Delete"><i class="bi bi-trash"></i></button></td>`;
+            tr.querySelector('button').addEventListener('click', ()=>{
+              appointments = appointments.filter(x=>x.id!==a.id);
+              renderAppointments();
+            });
+            tbody.appendChild(tr);
+          });
+        }
+        $('#apptForm').addEventListener('submit', e=>{
+          e.preventDefault();
+          const a = {
+            id:'a'+(Math.random()*1e6|0),
+            date: $('#apptDate').value, time: $('#apptTime').value,
+            patient: $('#apptPatient').value, clinician: $('#apptClinician').value,
+            notes: $('#apptNotes').value
+          };
+          appointments.push(a);
+          bootstrap.Modal.getInstance($('#modalAppointment')).hide();
+          $('#apptForm').reset();
+          renderAppointments();
+        });
+
+        /* ============================
+           EXPORT USERS CSV
+           ============================ */
+        $('#btnExportUsers').addEventListener('click', ()=>{
+          const rows = [['Name','Email','Role','Status','Assigned']];
+          users.forEach(u=>{
+            const assigned = u.role==='Clinician' ? (u.assigned?.length||0) : (u.assignedTo?1:0);
+            rows.push([csvEscape(u.name), csvEscape(u.email), u.role, u.status, assigned]);
+          });
+          const csv = rows.map(r=>r.join(',')).join('\n');
+          const url = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+          const a = Object.assign(document.createElement('a'), { href:url, download:'users.csv' });
+          document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+        });
+
+        /* ============================
+           INIT
+           ============================ */
+        document.addEventListener('DOMContentLoaded', ()=>{
+          renderUsers(); hydrateSelectors(); renderLogs(); buildMonitoringCharts(); renderAppointments(); loadSettings();
+
+          $('#searchUsers').addEventListener('input', renderUsers);
+          $('#btnArchive').addEventListener('click', ()=> alert('Archive complete (demo).'));
+        });
+    </script>
+}
