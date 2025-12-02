@@ -1,126 +1,210 @@
-@* File: Views/Home/Reports.cshtml *@
 @{
     ViewData["Title"] = "Reports";
 }
 
-@* File: Views/Home/Reports.cshtml *@
-@{
-    ViewData["Title"] = "Reports";
-}
+<div class="reports-container">
+    <h1 class="page-title">Pressure Mapping Reports</h1>
 
-<section class="reports-container">
-  <h1 class="page-title">Reports</h1>
+    <!-- FILTER PANEL -->
+    <form class="report-filters" onsubmit="return UI.generateReport(event);">
+        <div>
+            <label for="repPatient">Patient</label>
+            <select id="repPatient" class="form-select form-select-sm">
+                <option value="">Select patient…</option>
+            </select>
+        </div>
 
-  <!-- Filters / Controls -->
-  <form class="report-filters" onsubmit="return window.UI.generateReport(event);">
-    <div>
-      <label for="repPatient" class="form-label">Patient</label>
-      <select id="repPatient" required>
-        <option value="" disabled selected>Select patient…</option>
-        @* Populated by site.js on load *@
-      </select>
-    </div>
+        <div>
+            <label for="repRange">Time Range</label>
+            <select id="repRange" class="form-select form-select-sm">
+                <option value="1h">Last 1h</option>
+                <option value="6h">Last 6h</option>
+                <option value="24h" selected>Last 24h</option>
+            </select>
+        </div>
 
-    <div>
-      <label for="repRange" class="form-label">Time Range</label>
-      <select id="repRange">
-        <option value="24h">Last 24 hours</option>
-        <option value="7d">Last 7 days</option>
-        <option value="30d">Last 30 days</option>
-        <option value="custom">Custom range…</option>
-      </select>
-    </div>
-
-    <div class="d-flex align-items-end justify-content-end">
-      <button class="btn btn-primary" type="submit">
-        <i class="bi bi-file-earmark-bar-graph me-1"></i> Generate
-      </button>
-    </div>
-
-    <!-- Custom range row (shows only when 'custom' selected) -->
-    <div id="customRangeFields" class="d-flex gap-2" hidden style="grid-column: 1 / -1;">
-      <div>
-        <label for="repStart" class="form-label">Start</label>
-        <input id="repStart" type="date" />
-      </div>
-      <div>
-        <label for="repEnd" class="form-label">End</label>
-        <input id="repEnd" type="date" />
-      </div>
-    </div>
-  </form>
-
-  <!-- Top Summary KPIs -->
-  <div class="report-grid" id="repSummary">
-    <div class="kpi-card">
-      <div class="kpi-title">Peak PPI</div>
-      <div class="kpi-value" id="repPeak">—</div>
-      <div class="kpi-trend">Highest recorded in range</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-title">Average PPI</div>
-      <div class="kpi-value" id="repAvg">—</div>
-      <div class="kpi-trend">Mean value across frames</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-title">Contact Area %</div>
-      <div class="kpi-value" id="repContact">—</div>
-      <div class="kpi-trend">Pixels ≥ lower threshold</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-title">Alerts</div>
-      <div class="kpi-value" id="repAlerts">0</div>
-      <div class="kpi-trend">Flagged periods</div>
-    </div>
-  </div>
-
-  <!-- Preview Card -->
-  <div class="report-preview mt-2">
-    <div class="report-preview-header">
-      <h2>Report Preview</h2>
-      <div class="actions">
-        <button type="button" class="btn-export" onclick="window.UI.exportReport('pdf')">
-          <i class="bi bi-filetype-pdf"></i> PDF
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-graph-up-arrow me-1"></i>
+            Generate report
         </button>
-        <button type="button" class="btn-export" onclick="window.UI.exportReport('csv')">
-          <i class="bi bi-filetype-csv"></i> CSV
-        </button>
-      </div>
-    </div>
+    </form>
 
-    <div class="chart-box">
-      <canvas id="reportChart"></canvas>
-      @* If desired, show an empty-state hint until data renders:
-         <div class="empty-state">Generate a report to see charts here</div> *@
-    </div>
+    <!-- GRID: PREVIEW + SIDE CARDS -->
+    <div class="report-grid">
 
-    <table class="report-table">
-      <thead>
-        <tr>
-          <th>Timestamp</th>
-          <th>Peak PPI</th>
-          <th>Contact %</th>
-          <th>Alerts</th>
-        </tr>
-      </thead>
-      <tbody id="tblReport">
-        @* Populated by site.js (populateReport) *@
-      </tbody>
-    </table>
-  </div>
-</section>
+        <!-- MAIN REPORT PREVIEW -->
+        <div class="report-preview">
+            <div class="report-preview-header">
+                <h2>Session Trend & Summary</h2>
+
+                <div class="actions">
+                    <button type="button" id="btnExport" class="btn-export">
+                        <i class="bi bi-download me-1"></i> Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- KPI STRIP -->
+            <div class="preview-kpis">
+                <div class="kpi-card">
+                    <div class="kpi-title">Peak PPI</div>
+                    <div id="repPeak" class="kpi-value">—</div>
+                    <div class="kpi-trend">Highest recorded PPI</div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-title">Average PPI</div>
+                    <div id="repAvg" class="kpi-value">—</div>
+                    <div class="kpi-trend">Across sessions</div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-title">Avg Contact Area</div>
+                    <div id="repContact" class="kpi-value">—</div>
+                    <div class="kpi-trend">Surface % under load</div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-title">High-Risk Sessions</div>
+                    <div id="repAlerts" class="kpi-value">—</div>
+                    <div class="kpi-trend">Flagged episodes</div>
+                </div>
+            </div>
+
+            <!-- CHART -->
+            <div class="chart-box">
+                <canvas id="reportChart"></canvas>
+            </div>
+
+            <!-- TABLE -->
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Session</th>
+                        <th>Peak PPI</th>
+                        <th>Contact %</th>
+                        <th>Risk</th>
+                    </tr>
+                </thead>
+                <tbody id="tblReport">
+                    <tr>
+                        <td colspan="4" class="text-muted">Select a patient and generate the report.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- SIDE PANEL -->
+        <div class="d-flex flex-column gap-3">
+
+            <div class="report-card">
+                <div class="report-header">
+                    <h3><i class="bi bi-activity me-2"></i>Metrics Explained</h3>
+                </div>
+
+                <p class="small text-muted">
+                    Reports are based on:
+                </p>
+                <ul class="small text-muted">
+                    <li><b>PPI (Peak Pressure Index)</b> – maximum pressure during a session.</li>
+                    <li><b>Contact Area %</b> – percentage of sensors actively loaded.</li>
+                    <li><b>Alerts</b> – generated when thresholds exceed safe levels.</li>
+                </ul>
+            </div>
+
+            <div class="report-card">
+                <div class="report-header">
+                    <h3><i class="bi bi-info-circle me-2"></i>How to Use</h3>
+                </div>
+
+                <p class="small text-muted">
+                    Choose a patient and time window, then generate a full session trend with KPIs and export capability.
+                </p>
+            </div>
+
+        </div>
+    </div>
+</div>
 
 @section Scripts {
-<script>
-  // Toggle custom date inputs when "Custom range" is selected
-  (function () {
-    const sel = document.getElementById('repRange');
-    const block = document.getElementById('customRangeFields');
-    if (!sel || !block) return;
-    block.hidden = sel.value !== 'custom';
-    sel.addEventListener('change', () => {
-      block.hidden = sel.value !== 'custom';
-    });
-  })();
-</script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="~/js/charts.js" asp-append-version="true"></script>
+    <script src="~/js/sensor-metrics.js" asp-append-version="true"></script>
+
+    <script>
+        /*******************************************
+         *    REPORT-LEVEL RENDERING LOGIC
+         *******************************************/
+        let reportChart = null;
+
+        window.UI = window.UI || {};
+
+        UI.generateReport = function (e) {
+            if (e) e.preventDefault();
+
+            const pid = repPatient.value;
+            const range = repRange.value;
+
+            if (!pid) {
+                tblReport.innerHTML = `<tr><td colspan="4" class="text-muted">Select a patient.</td></tr>`;
+                return false;
+            }
+
+            SensorData.loadPatientMetrics(pid).then(metrics => {
+                const sliced = SensorData.sliceByRange(metrics, range);
+
+                // Draw Chart
+                if (reportChart) reportChart.destroy();
+                reportChart = Charts.mkCompareChart(
+                    reportChart.getContext ? reportChart.getContext("2d") : document.getElementById("reportChart").getContext("2d"),
+                    sliced.labels,
+                    sliced.ppi,
+                    sliced.contact,
+                    "PPI",
+                    "Contact %"
+                );
+
+                // KPIs
+                repPeak.textContent = metrics.summary.peak.toFixed(0);
+                repAvg.textContent = metrics.summary.avg.toFixed(1);
+                repContact.textContent = metrics.summary.avgContact.toFixed(1) + "%";
+                repAlerts.textContent = metrics.summary.highAlerts;
+
+                // Table
+                tblReport.innerHTML = "";
+                if (sliced.labels.length === 0) {
+                    tblReport.innerHTML = `<tr><td colspan="4" class="text-muted">No sessions in range.</td></tr>`;
+                } else {
+                    for (let i = sliced.labels.length - 1; i >= 0; i--) {
+                        const risk =
+                            sliced.ppi[i] >= 220 || sliced.contact[i] >= 70 ? "⚠️ High" :
+                            sliced.ppi[i] > 20 || sliced.contact[i] > 10 ? "🟡 Monitor" :
+                            "✓ Stable";
+
+                        tblReport.innerHTML += `
+                            <tr>
+                                <td>${sliced.labels[i]}</td>
+                                <td>${sliced.ppi[i].toFixed(0)}</td>
+                                <td>${sliced.contact[i].toFixed(1)}%</td>
+                                <td>${risk}</td>
+                            </tr>`;
+                    }
+                }
+            });
+
+            return false;
+        };
+
+        /*******************************************
+         * Populate patients dropdown
+         *******************************************/
+        document.addEventListener("DOMContentLoaded", () => {
+            for (const [id, p] of Object.entries(SensorData.SENSOR_INDEX.patients)) {
+                const opt = document.createElement("option");
+                opt.value = id;
+                opt.textContent = `${p.name} (${p.id})`;
+                repPatient.appendChild(opt);
+            }
+        });
+    </script>
 }

@@ -102,7 +102,7 @@ window.UI = (() => {
     return false;
   }
 
-  // 📈 Generate report (UI only)
+  // Generate report (UI only)
   function generateReport(e) {
     e.preventDefault();
     alert("Generating demo report...");

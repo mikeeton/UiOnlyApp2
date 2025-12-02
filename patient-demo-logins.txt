@@ -1,0 +1,16 @@
+# Demo patient logins for sensore
+# NOTE: These accounts are for DEVELOPMENT ONLY.
+# Role for all users: Patient
+# Format:
+# PatientId | Name             | Email                         | TempPassword
+
+1c0fd777    | Michael Eton      | michael.eton@patient.demo      | Demo123!
+71e66ab3    | Jason Ghanian     | jason.ghanian@patient.demo     | Demo123!
+543d4676    | Alex Jenkins      | alex.jenkins@patient.demo      | Demo123!
+d13043b3    | Richard Afana     | richard.afana@patient.demo     | Demo123!
+de0e9b2c    | De Luca           | de.luca@patient.demo           | Demo123!
+
+# Additional demo roles
+
+Admin       | admin@example.com        | Admin123!
+Clinician   | clinician@example.com    | Clinician123!

@@ -1,66 +1,97 @@
-@{
-    var user = Context.User;
-    var isAuthenticated = user?.Identity?.IsAuthenticated ?? false;
-    var role = user?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
-}
-<nav class="navbar navbar-expand-lg navbar-dark fixed-top">
-    <div class="container">
-        <a class="navbar-brand" asp-controller="Home" asp-action="Index">
-            <i class="bi bi-cpu me-2 text-primary"></i>GrapheneTrace
-        </a>
+@using Microsoft.AspNetCore.Identity
+@inject SignInManager<IdentityUser> SignInManager
+@inject UserManager<IdentityUser> UserManager
 
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark px-3" style="backdrop-filter: blur(10px);">
 
-        <div class="collapse navbar-collapse" id="navbarMain">
-            <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-                @if (!isAuthenticated)
+    <!-- BRAND LOGO + NAME -->
+    <a class="navbar-brand d-flex align-items-center fw-bold text-light"
+       asp-controller="Home" asp-action="Index">
+
+        <!-- Neon Logo Circle -->
+        <span class="d-inline-flex align-items-center justify-content-center rounded-circle me-2"
+              style="width:28px; height:28px;
+                     background:linear-gradient(135deg,#5b7cfa,#4de2c2);
+                     box-shadow:0 0 10px rgba(91,124,250,.6);">
+            <i class="bi bi-activity text-dark" style="font-size:1rem;"></i>
+        </span>
+
+        Sensore
+    </a>
+
+    <!-- MOBILE TOGGLER -->
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarMain">
+
+        <!-- LEFT MENU -->
+        <ul class="navbar-nav me-auto">
+
+            @if (SignInManager.IsSignedIn(User))
+            {
+                @* Admin *@
+                @if (User.IsInRole("Admin"))
                 {
                     <li class="nav-item">
-                        <a class="nav-link @(ViewData["Title"]?.ToString() == "Login" ? "active" : "")"
-                           asp-controller="Account" asp-action="Login">
-                            <i class="bi bi-box-arrow-in-right me-1"></i>Login
-                        </a>
+                        <a class="nav-link" asp-controller="Dashboard" asp-action="Admin">Admin Dashboard</a>
                     </li>
                 }
-                else
-                {
-                    if (role == "Patient")
-                    {
-                        <li class="nav-item">
-                            <a class="nav-link @(ViewData["Title"]?.ToString() == "Patient Dashboard" ? "active" : "")"
-                               asp-controller="Dashboard" asp-action="Index">
-                                <i class="bi bi-heart-pulse me-1"></i>Patient
-                            </a>
-                        </li>
-                    }
-                    else if (role == "Clinician")
-                    {
-                        <li class="nav-item">
-                            <a class="nav-link @(ViewData["Title"]?.ToString() == "Clinician Dashboard" ? "active" : "")"
-                               asp-controller="Dashboard" asp-action="Clinician">
-                                <i class="bi bi-person-workspace me-1"></i>Clinician
-                            </a>
-                        </li>
-                    }
-                    else if (role == "Admin")
-                    {
-                        <li class="nav-item">
-                            <a class="nav-link @(ViewData["Title"]?.ToString() == "Admin Dashboard" ? "active" : "")"
-                               asp-controller="Dashboard" asp-action="Admin">
-                                <i class="bi bi-gear-wide-connected me-1"></i>Admin
-                            </a>
-                        </li>
-                    }
 
+                @* Clinician *@
+                @if (User.IsInRole("Clinician"))
+                {
                     <li class="nav-item">
-                        <a class="nav-link text-warning" asp-controller="Account" asp-action="Logout">
-                            <i class="bi bi-box-arrow-right me-1"></i>Logout
-                        </a>
+                        <a class="nav-link" asp-controller="Dashboard" asp-action="Clinician">Clinician Dashboard</a>
                     </li>
                 }
-            </ul>
-        </div>
+
+                @* Patient *@
+                @if (User.IsInRole("Patient"))
+                {
+                    <li class="nav-item">
+                        <a class="nav-link" asp-controller="Dashboard" asp-action="Index">Patient Dashboard</a>
+                    </li>
+                }
+            }
+
+        </ul>
+
+        <!-- RIGHT MENU (USER INFO + LOGOUT) -->
+        <ul class="navbar-nav ms-auto align-items-center">
+
+            @if (SignInManager.IsSignedIn(User))
+            {
+                <!-- Username -->
+                <li class="nav-item me-3">
+                    <span class="nav-link text-info fw-semibold">
+                        @User.Identity?.Name
+                    </span>
+                </li>
+
+                <!-- Logout -->
+                <li class="nav-item">
+                    <a class="nav-link text-danger fw-semibold" href="/Account/Logout">
+                        <i class="bi bi-box-arrow-right me-1"></i> Logout
+                    </a>
+                </li>
+            }
+            else
+            {
+                <!-- Login / Register -->
+                <li class="nav-item">
+                    <a class="nav-link" asp-area="Identity" asp-page="/Account/Login">Login</a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="btn btn-outline-primary ms-2 rounded-pill"
+                       asp-area="Identity" asp-page="/Account/Register">
+                        Register
+                    </a>
+                </li>
+            }
+
+        </ul>
     </div>
 </nav>

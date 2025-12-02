@@ -1,8 +1,24 @@
-@* --- _Heatmap.cshtml : Sensor visualization panel --- *@
+﻿@using System.Security.Claims
+
+@{
+    // Check if the logged-in user is a Patient and has a PatientId claim
+    var isPatient = User.IsInRole("Patient");
+    var patientIdClaim = User.FindFirst("PatientId")?.Value ?? "";
+}
+
 <div class="card heatmap-card shadow-sm">
-    <div class="card-header fw-semibold">
-        <i class="bi bi-grid-3x3-gap-fill text-primary me-2"></i>Pressure Map
-        <div class="ms-auto">
+    <div class="card-header fw-semibold d-flex align-items-center gap-2">
+        <i class="bi bi-grid-3x3-gap-fill text-primary me-2"></i>
+        <span>Pressure Map</span>
+
+        <div class="ms-auto d-flex flex-wrap gap-2 align-items-center">
+            <!-- Patient selector (locked for patients, free for clinicians/admins) -->
+
+
+            <select id="hmDate" class="form-select form-select-sm" style="min-width: 140px;">
+                <option value="">Date…</option>
+            </select>
+
             <select id="paletteSelect" class="form-select form-select-sm">
                 <option value="default">Default Palette</option>
                 <option value="warm">Warm Gradient</option>
@@ -11,42 +27,416 @@
             </select>
         </div>
     </div>
+
     <div class="card-body p-0">
         <div class="heatmap-wrap ratio ratio-1x1">
             <canvas id="heatmapCanvas"></canvas>
         </div>
-    </div>
-    <div class="card-footer small text-muted text-center">
-        Updated <span id="heatmapTimestamp">just now</span>
+
+        <!-- Metrics row: PPI, Contact Area, Alert -->
+        <div class="d-flex flex-wrap justify-content-between gap-3 px-3 pt-3 pb-2 small">
+            <div>
+                <div class="text-muted text-uppercase" style="font-size:.7rem; letter-spacing:.12em;">
+                    Peak Pressure Index
+                </div>
+                <div id="kpiPPI" class="fw-bold">
+                    —
+                </div>
+            </div>
+            <div>
+                <div class="text-muted text-uppercase" style="font-size:.7rem; letter-spacing:.12em;">
+                    Contact Area %
+                </div>
+                <div id="kpiContactArea" class="fw-bold">
+                    —
+                </div>
+            </div>
+            <div>
+                <div class="text-muted text-uppercase" style="font-size:.7rem; letter-spacing:.12em;">
+                    Status
+                </div>
+                <div id="kpiAlert" class="fw-bold">
+                    —
+                </div>
+            </div>
+        </div>
+
+        <div class="p-3 small text-muted" id="heatmapStatus">
+            @if (isPatient && !string.IsNullOrEmpty(patientIdClaim))
+            {
+                @:Loading your latest session map…
+            }
+            else
+            {
+                @:Select a patient and date to load a session heatmap.
+            }
+        </div>
     </div>
 </div>
 
 @section Scripts {
+    <script src="~/js/heatmap.js" asp-append-version="true"></script>
+
     <script>
-        // --- Demo Heatmap rendering (mock data) ---
+        // ----- 0) Context from server (Razor → JS) -----
+        const IS_PATIENT = @((isPatient ? "true" : "false"));
+        const LOGGED_IN_PATIENT_ID = '@patientIdClaim';
+
+        // ----- 1) Index JSON (from your earlier message) -----
+        const SENSOR_INDEX = {
+            patients: {
+                "1c0fd777": {
+                    name: "Michael Eton",
+                    files: {
+                        "2025-10-11": "1c0fd777_20251011.csv",
+                        "2025-10-12": "1c0fd777_20251012.csv",
+                        "2025-10-13": "1c0fd777_20251013.csv"
+                    }
+                },
+                "71e66ab3": {
+                    name: "Jason Ghanian",
+                    files: {
+                        "2025-10-11": "71e66ab3_20251011.csv",
+                        "2025-10-12": "71e66ab3_20251012.csv",
+                        "2025-10-13": "71e66ab3_20251013.csv"
+                    }
+                },
+                "543d4676": {
+                    name: "Alex Jenkins",
+                    files: {
+                        "2025-10-11": "543d4676_20251011.csv",
+                        "2025-10-12": "543d4676_20251012.csv",
+                        "2025-10-13": "543d4676_20251013.csv"
+                    }
+                },
+                "d13043b3": {
+                    name: "Richard Afana",
+                    files: {
+                        "2025-10-11": "d13043b3_20251011.csv",
+                        "2025-10-12": "d13043b3_20251012.csv",
+                        "2025-10-13": "d13043b3_20251013.csv"
+                    }
+                },
+                "de0e9b2c": {
+                    name: "De Luca",
+                    files: {
+                        "2025-10-11": "de0e9b2c_20251011.csv",
+                        "2025-10-12": "de0e9b2c_20251012.csv",
+                        "2025-10-13": "de0e9b2c_20251013.csv"
+                    }
+                }
+            }
+        };
+
+        // Folder under wwwroot/ where CSVs live (e.g. wwwroot/sensor-data/*.csv)
+        const SENSOR_BASE_URL = "/sensor-data/";
+
+        // Thresholds based on case study:
+        // sensor values 1–255, 1 = zero-force baseline
+        const BASELINE_VALUE = 1;
+        const CONTACT_THRESHOLD = 5;      // pixels > 5 count as "in contact"
+        const ALERT_PPI_THRESHOLD = 220;  // high peak pressure
+        const ALERT_AREA_THRESHOLD = 70;  // 70% contact area
+
+        let hmCanvas, hmCtx;
+        let currentFrame = null;
+        let currentPatientId = null;
+        let currentDateKey = null;
+
         document.addEventListener("DOMContentLoaded", () => {
-            const canvas = document.getElementById("heatmapCanvas");
-            const ctx = canvas.getContext("2d");
-            const w = canvas.width = 256;
-            const h = canvas.height = 256;
+            hmCanvas = document.getElementById("heatmapCanvas");
+            if (!hmCanvas) return;
+            hmCtx = hmCanvas.getContext("2d");
 
-            const gradient = ctx.createLinearGradient(0, 0, w, h);
-            gradient.addColorStop(0, "#1e3a8a");
-            gradient.addColorStop(0.3, "#3b82f6");
-            gradient.addColorStop(0.6, "#facc15");
-            gradient.addColorStop(1, "#ef4444");
+            const selPatient = document.getElementById("hmPatient");
+            const selDate = document.getElementById("hmDate");
+            const selPalette = document.getElementById("paletteSelect");
+            const statusEl = document.getElementById("heatmapStatus");
 
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, w, h);
+            // KPI elements
+            const elPPI = document.getElementById("kpiPPI");
+            const elContact = document.getElementById("kpiContactArea");
+            const elAlert = document.getElementById("kpiAlert");
 
-            // Draw soft circular zone (demo hotspot)
-            const g = ctx.createRadialGradient(150, 120, 20, 150, 120, 80);
-            g.addColorStop(0, "rgba(255, 100, 0, 0.8)");
-            g.addColorStop(1, "rgba(255, 255, 255, 0)");
-            ctx.fillStyle = g;
-            ctx.beginPath();
-            ctx.arc(150, 120, 80, 0, 2 * Math.PI);
-            ctx.fill();
+            // 2) Populate patient dropdown
+            for (const [id, meta] of Object.entries(SENSOR_INDEX.patients)) {
+                const opt = document.createElement("option");
+                opt.value = id;
+                opt.textContent = `${meta.name} (${id})`;
+                selPatient.appendChild(opt);
+            }
+
+            // 3) If the logged-in user is a Patient, lock the dropdown to THEIR PatientId
+            if (IS_PATIENT && LOGGED_IN_PATIENT_ID && SENSOR_INDEX.patients[LOGGED_IN_PATIENT_ID]) {
+                selPatient.value = LOGGED_IN_PATIENT_ID;
+                selPatient.disabled = true; // patient cannot switch to others
+                currentPatientId = LOGGED_IN_PATIENT_ID;
+
+                populateDatesForCurrentPatient(selDate, statusEl);
+            }
+
+            // Clinicians/admins: allow manual selection
+            selPatient.addEventListener("change", () => {
+                currentPatientId = selPatient.value || null;
+                currentFrame = null;
+                clearCanvas();
+                resetKpis(elPPI, elContact, elAlert);
+                statusEl.textContent = "Select a date to load the session heatmap.";
+
+                populateDatesForCurrentPatient(selDate, statusEl);
+            });
+
+            selDate.addEventListener("change", () => {
+                if (!currentPatientId || !selDate.value) {
+                    currentDateKey = null;
+                    currentFrame = null;
+                    clearCanvas();
+                    resetKpis(elPPI, elContact, elAlert);
+                    statusEl.textContent = IS_PATIENT
+                        ? "Select a date to load your session heatmap."
+                        : "Select a patient and date to load a session heatmap.";
+                    return;
+                }
+
+                currentDateKey = selDate.value;
+                const patientMeta = SENSOR_INDEX.patients[currentPatientId];
+                if (!patientMeta) {
+                    statusEl.textContent = "Unknown patient.";
+                    clearCanvas();
+                    resetKpis(elPPI, elContact, elAlert);
+                    return;
+                }
+
+                const fileName = patientMeta.files[currentDateKey];
+                if (!fileName) {
+                    statusEl.textContent = "No file found for this date.";
+                    clearCanvas();
+                    resetKpis(elPPI, elContact, elAlert);
+                    return;
+                }
+
+                const url = SENSOR_BASE_URL + fileName;
+                statusEl.textContent = "Loading " + fileName + "…";
+
+                fetch(url)
+                    .then(r => {
+                        if (!r.ok) throw new Error("HTTP " + r.status);
+                        return r.text();
+                    })
+                    .then(csv => {
+                        currentFrame = parseCsvToFrame(csv);
+                        if (!currentFrame) {
+                            statusEl.textContent = "Could not parse CSV for " + fileName;
+                            clearCanvas();
+                            resetKpis(elPPI, elContact, elAlert);
+                            return;
+                        }
+
+                        renderCurrentFrame();
+
+                        const ppi = computePPI(currentFrame);
+                        const contactPct = computeContactAreaPct(currentFrame, CONTACT_THRESHOLD);
+                        const alertInfo = computeAlert(ppi, contactPct);
+
+                        elPPI.textContent = ppi.toFixed(0);
+                        elContact.textContent = contactPct.toFixed(1) + " %";
+                        elAlert.textContent = alertInfo.label;
+                        elAlert.classList.remove("text-success", "text-warning", "text-danger");
+                        elAlert.classList.add(alertInfo.cssClass);
+
+                        statusEl.textContent =
+                            patientMeta.name + " • " + currentDateKey;
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        statusEl.textContent = "Error loading " + fileName + ". Check file path.";
+                        clearCanvas();
+                        resetKpis(elPPI, elContact, elAlert);
+                    });
+            });
+
+            selPalette.addEventListener("change", () => {
+                if (currentFrame) {
+                    renderCurrentFrame();
+                }
+            });
+
+            if (!(IS_PATIENT && LOGGED_IN_PATIENT_ID)) {
+                clearCanvas();
+                resetKpis(elPPI, elContact, elAlert);
+            }
         });
+
+        function populateDatesForCurrentPatient(selDate, statusEl) {
+            selDate.innerHTML = '<option value="">Date…</option>';
+
+            if (!currentPatientId || !SENSOR_INDEX.patients[currentPatientId]) {
+                return;
+            }
+
+            const files = SENSOR_INDEX.patients[currentPatientId].files;
+            const sortedDates = Object.keys(files).sort();
+
+            for (const d of sortedDates) {
+                const opt = document.createElement("option");
+                opt.value = d;
+                opt.textContent = d;
+                selDate.appendChild(opt);
+            }
+
+            if (sortedDates.length > 0) {
+                // Auto-select most recent date
+                selDate.value = sortedDates[sortedDates.length - 1];
+                selDate.dispatchEvent(new Event("change"));
+            } else {
+                statusEl.textContent = "No sessions found for this patient.";
+                clearCanvas();
+            }
+        }
+
+        // ----- CSV → frame (flattened 32x32) -----
+        function parseCsvToFrame(csvText) {
+            if (!csvText) return null;
+
+            const lines = csvText.trim().split(/\r?\n/).filter(l => l.trim() !== "");
+            const vals = [];
+
+            for (const line of lines) {
+                const parts = line.split(/[,;\s]+/).filter(p => p.length > 0);
+                for (const p of parts) {
+                    const v = Number(p);
+                    if (!Number.isNaN(v)) vals.push(v);
+                }
+            }
+
+            const N = 32 * 32;
+            if (vals.length < N) {
+                while (vals.length < N) vals.push(BASELINE_VALUE);
+            } else if (vals.length > N) {
+                vals.length = N;
+            }
+
+            return vals;
+        }
+
+        // Map UI palette → HeatmapSim palette name
+        function mapPalette(uiValue) {
+            switch (uiValue) {
+                case "warm":
+                    return "inferno";
+                case "cool":
+                    return "viridis";
+                case "contrast":
+                    return "gray";
+                case "default":
+                default:
+                    return "inferno";
+            }
+        }
+
+        // Draw heatmap: use HeatmapSim if available, otherwise simple fallback
+        function renderCurrentFrame() {
+            if (!hmCanvas || !currentFrame) return;
+            const paletteSelect = document.getElementById("paletteSelect");
+            const palName = mapPalette(paletteSelect?.value || "default");
+
+            if (window.HeatmapSim && typeof HeatmapSim.drawHeatmap === "function") {
+                HeatmapSim.drawHeatmap(hmCanvas, currentFrame, palName);
+            } else {
+                const SIZE = 32;
+                const ctx = hmCanvas.getContext("2d");
+                const w = 256, h = 256;
+                hmCanvas.width = w;
+                hmCanvas.height = h;
+
+                const img = ctx.createImageData(SIZE, SIZE);
+                let min = Infinity, max = -Infinity;
+                for (const v of currentFrame) {
+                    if (v < min) min = v;
+                    if (v > max) max = v;
+                }
+                const range = max - min || 1;
+
+                for (let i = 0; i < currentFrame.length; i++) {
+                    const t = (currentFrame[i] - min) / range;
+                    const r = Math.floor(255 * t);
+                    const b = Math.floor(255 * (1 - t));
+                    const g = Math.floor(80 + 50 * t);
+                    const idx = i * 4;
+                    img.data[idx] = r;
+                    img.data[idx + 1] = g;
+                    img.data[idx + 2] = b;
+                    img.data[idx + 3] = 255;
+                }
+
+                const tmp = document.createElement("canvas");
+                tmp.width = SIZE;
+                tmp.height = SIZE;
+                tmp.getContext("2d").putImageData(img, 0, 0);
+
+                ctx.imageSmoothingEnabled = false;
+                ctx.clearRect(0, 0, w, h);
+                ctx.drawImage(tmp, 0, 0, w, h);
+            }
+        }
+
+        function clearCanvas() {
+            if (!hmCanvas || !hmCtx) return;
+            hmCanvas.width = hmCanvas.width;
+        }
+
+        function resetKpis(elPPI, elContact, elAlert) {
+            elPPI.textContent = "—";
+            elContact.textContent = "—";
+            elAlert.textContent = "—";
+            elAlert.classList.remove("text-success", "text-warning", "text-danger");
+        }
+
+        // ----- Metrics based on case study -----
+        // Peak Pressure Index: highest recorded pressure (ignoring baseline / near-zero)
+        function computePPI(frame) {
+            let maxVal = 0;
+            for (const v of frame) {
+                if (v > BASELINE_VALUE && v > maxVal) {
+                    maxVal = v;
+                }
+            }
+            return maxVal;
+        }
+
+        // Contact Area %: % of pixels above threshold
+        function computeContactAreaPct(frame, threshold) {
+            const total = frame.length || 1;
+            let count = 0;
+            for (const v of frame) {
+                if (v > threshold) count++;
+            }
+            return (count / total) * 100.0;
+        }
+
+        // Simple alert logic combining PPI + Contact Area
+        function computeAlert(ppi, contactPct) {
+            // High risk
+            if (ppi >= ALERT_PPI_THRESHOLD || contactPct >= ALERT_AREA_THRESHOLD) {
+                return {
+                    label: "High risk",
+                    cssClass: "text-danger"
+                };
+            }
+
+            // Mild/moderate risk – above baseline but below alert thresholds
+            if (ppi > BASELINE_VALUE + 10 || contactPct > 10) {
+                return {
+                    label: "Monitor",
+                    cssClass: "text-warning"
+                };
+            }
+
+            // Everything very low
+            return {
+                label: "Stable",
+                cssClass: "text-success"
+            };
+        }
     </script>
 }

@@ -1,431 +1,281 @@
 @{
     ViewData["Title"] = "Clinician Dashboard";
-    Layout = "_Layout";
 }
 
 <div class="container py-4">
-    <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-        <div class="d-flex align-items-center">
-            <i class="bi bi-person-workspace fs-3 text-info me-2"></i>
-            <h2 class="fw-semibold mb-0">Clinician Dashboard</h2>
-        </div>
-
-        <!-- Time range chips -->
-        <div class="btn-group" role="group" aria-label="Time ranges">
-            <button data-range="1h" class="btn btn-outline-secondary btn-sm active">Last 1h</button>
-            <button data-range="6h" class="btn btn-outline-secondary btn-sm">6h</button>
-            <button data-range="24h" class="btn btn-outline-secondary btn-sm">24h</button>
-            <button data-range="7d" class="btn btn-outline-secondary btn-sm">7d</button>
-        </div>
-    </div>
-
-    <!-- Patient overview grid -->
-    <div class="card mb-4">
-        <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
-            <span><i class="bi bi-people text-primary me-2"></i>Assigned Patients</span>
-            <div class="d-flex gap-2">
-                <select id="selGroup" class="form-select form-select-sm" style="width:auto;">
-                    <option selected>Ward A</option>
-                    <option>Ward B</option>
-                </select>
-                <input id="patientSearch" class="form-control form-control-sm" style="width:220px" placeholder="Search patient..." />
-            </div>
-        </div>
-        <div class="card-body">
-            <div id="patientsGrid" class="row g-3">
-                <!-- JS renders cards here -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Visuals row -->
-    <div class="row g-4">
-        <div class="col-lg-6">
-            @* Interactive Heatmap *@
-            @await Html.PartialAsync("_Heatmap")
-        </div>
-        <div class="col-lg-6">
-            <div class="card p-3">
-                <div class="card-header fw-semibold">Key Metrics</div>
-                <div class="row g-3">
-                    <div class="col-12">
-                        <div class="ratio ratio-16x9"><canvas id="chartPeak"></canvas></div>
+    <!-- HEADER -->
+    <section class="mb-4">
+        <div class="hero-slab p-4 p-md-5 mb-3">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <span class="badge text-bg-primary mb-3">Clinician view</span>
+                    <h1 class="display-6 mb-2">Patient monitoring workspace</h1>
+                    <p class="text-muted mb-3">
+                        Review pressure mapping trends, spot high-risk sessions, and drill into individual
+                        patients’ heatmaps. All metrics are computed from the same sensor data used in the patient view.
+                    </p>
+                    <div class="d-flex flex-wrap gap-2 small text-muted">
+                        <span><i class="bi bi-people-fill me-1"></i>Multi-patient oversight</span>
+                        <span><i class="bi bi-bell me-1"></i>High-risk flags</span>
                     </div>
-                    <div class="col-12">
-                        <div class="ratio ratio-16x9"><canvas id="chartArea"></canvas></div>
+                </div>
+                <div class="col-md-4 mt-4 mt-md-0 text-md-end">
+                    <div class="d-inline-flex flex-column align-items-md-end align-items-start gap-2 small">
+                        <div>
+                            <label class="form-label mb-1 small text-muted">Select patient</label>
+                            <select id="selPatient" class="form-select form-select-sm">
+                                <option value="">Choose patient…</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label mb-1 small text-muted">Time window</label>
+                            <select id="clinRange" class="form-select form-select-sm">
+                                <option value="1h">Last 1h</option>
+                                <option value="6h">Last 6h</option>
+                                <option value="24h" selected>Last 24h</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 
-    <!-- Trend comparison -->
-    <div class="card mt-4">
-        <div class="card-header fw-semibold d-flex align-items-center gap-2">
-            <i class="bi bi-graph-up-arrow text-primary"></i>
-            Trend Comparison
-            <span class="small text-muted ms-2">(This hour vs same hour yesterday)</span>
-        </div>
-        <div class="card-body">
-            <div class="ratio ratio-21x9"><canvas id="chartTrendCompare"></canvas></div>
-        </div>
-    </div>
+    <!-- TOP ROW: TREND + HEATMAP -->
+    <section class="mb-4">
+        <div class="row g-3">
+            <!-- Trend chart -->
+            <div class="col-lg-7">
+                <div class="card shadow-sm rounded-4">
+                    <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+                        <span>Trend overview</span>
+                        <span class="small text-muted" id="clinTrendSubtitle">
+                            Select a patient to view their sessions
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div class="ratio ratio-16x9">
+                            <canvas id="clinTrendChart"></canvas>
+                        </div>
+                        <p class="small text-muted mb-0 mt-2">
+                            Blue: <strong>Peak Pressure Index</strong> (max sensor pressure per session).<br />
+                            Green: <strong>Contact Area %</strong> (percentage of sensors above load threshold).
+                        </p>
+                    </div>
+                </div>
+            </div>
 
-    <!-- Alerts & Reviews -->
-    <div class="card mt-4">
-        <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
-            <span><i class="bi bi-bell text-warning me-2"></i>Flagged High-Pressure Events</span>
-            <div class="d-flex gap-2">
-                <button id="btnMarkReviewed" class="btn btn-outline-primary btn-sm">Mark Reviewed</button>
-                <button id="btnRequireFollow" class="btn btn-outline-primary btn-sm">Requires Follow-Up</button>
+            <!-- Heatmap for selected patient -->
+            <div class="col-lg-5">
+                @await Html.PartialAsync("_Heatmap")
             </div>
         </div>
-        <div class="table-responsive">
-            <table class="table table-hover mb-0" id="tblAlerts">
-                <thead>
-                    <tr>
-                        <th style="width:44px"><input type="checkbox" id="checkAll" /></th>
-                        <th>Time</th>
-                        <th>Peak Pressure</th>
-                        <th>Duration</th>
-                        <th>Region</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody><!-- JS renders --></tbody>
-            </table>
-        </div>
-    </div>
+    </section>
 
-    <!-- Patient Interaction (comments + notes) -->
-    <div class="row g-4 mt-2">
-        <div class="col-lg-6">
-            @await Html.PartialAsync("_CommentsThread")
-        </div>
-        <div class="col-lg-6">
-            <div class="card shadow-sm">
-                <div class="card-header fw-semibold">
-                    <i class="bi bi-journal-text text-primary me-2"></i>Clinical Notes (linked to data period)
+    <!-- BOTTOM ROW: FLAGS + NOTES -->
+    <section>
+        <div class="row g-3">
+            <!-- Risk flags -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm rounded-4">
+                    <div class="card-header fw-semibold">
+                        Risk flags
+                    </div>
+                    <div class="card-body p-0">
+                        <ul id="flagList" class="list-group list-group-flush small">
+                            <li class="list-group-item text-muted">
+                                Select a patient to see recent high-risk sessions.
+                            </li>
+                        </ul>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <form id="noteForm" class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">From</label>
-                            <input type="datetime-local" id="noteFrom" class="form-control" />
+            </div>
+
+            <!-- Clinician notes / comments -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm rounded-4">
+                    <div class="card-header fw-semibold">
+                        Clinician notes
+                    </div>
+                    <div class="card-body" id="clinThread">
+                        <div class="d-flex align-items-start mb-3 comment">
+                            <div class="avatar me-2">C</div>
+                            <div class="bubble">
+                                <div class="small fw-semibold">Dr. Patel</div>
+                                <div class="small text-muted mb-1">Today, 09:14</div>
+                                <div class="small">
+                                    Use this space to record your observations for each patient’s pressure profile,
+                                    including posture advice and follow-up actions.
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">To</label>
-                            <input type="datetime-local" id="noteTo" class="form-control" />
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Note</label>
-                            <textarea id="noteText" class="form-control" rows="3" placeholder="Observation / action..."></textarea>
-                        </div>
-                        <div class="col-12">
-                            <button class="btn btn-primary" type="submit">
-                                <i class="bi bi-plus-lg me-1"></i>Add Note
+                    </div>
+                    <div class="card-footer">
+                        <form class="d-flex gap-2" onsubmit="return UI && UI.addClinNote && UI.addClinNote(event);">
+                            <input type="text" class="form-control form-control-sm" id="clinNoteInput"
+                                   placeholder="Add a note about this patient…" />
+                            <button type="submit" class="btn btn-primary btn-sm">
+                                <i class="bi bi-send"></i>
                             </button>
-                        </div>
-                    </form>
-                    <hr />
-                    <ul id="notesList" class="list-group list-group-flush small">
-                        <!-- JS renders -->
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Reports -->
-    <div class="card mt-4">
-        <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
-            <span><i class="bi bi-file-earmark-bar-graph text-primary me-2"></i>Reports</span>
-            <div class="d-flex gap-2">
-                <button id="btnExportCsv" class="btn btn-primary btn-sm">
-                    <i class="bi bi-download me-1"></i>Export Summary
-                </button>
-                <button id="btnExportPdf" class="btn btn-outline-primary btn-sm">
-                    <i class="bi bi-filetype-pdf me-1"></i>Generate PDF (demo)
-                </button>
-            </div>
-        </div>
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <div class="kpi-card">
-                        <div class="kpi-title">Peak Pressure Index</div>
-                        <div id="repPeak" class="kpi-value">—</div>
-                        <div id="repPeakTrend" class="kpi-trend">—</div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="kpi-card">
-                        <div class="kpi-title">Contact Area %</div>
-                        <div id="repArea" class="kpi-value">—</div>
-                        <div id="repAreaTrend" class="kpi-trend">—</div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="kpi-card">
-                        <div class="kpi-title">Alerts Reviewed</div>
-                        <div id="repReviewed" class="kpi-value">—</div>
-                        <div id="repPending" class="kpi-trend">— pending</div>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 </div>
 
 @section Scripts {
+    <!-- Chart.js is already in _Layout, but safe to include again if needed -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="~/js/charts.js" asp-append-version="true"></script>
+    <script src="~/js/sensor-metrics.js" asp-append-version="true"></script>
+
     <script>
-        // ---------------------------
-        // Demo data (front-end only)
-        // ---------------------------
-        const demoPatients = [
-          { id:'p1', name:'Michael Brown', room:'203', risk:'Stable',     last:'09:14', peak:78 },
-          { id:'p2', name:'Anna Lewis',    room:'105', risk:'Needs Review', last:'09:10', peak:95 },
-          { id:'p3', name:'James Hart',    room:'301', risk:'High Pressure Alert', last:'08:52', peak:112 },
-          { id:'p4', name:'Linda Ray',     room:'214', risk:'Stable',     last:'08:37', peak:70 }
-        ];
+        (function () {
+            let clinChart = null;
 
-        const demoAlerts = [
-          { id:'a1', t:'09:02', peak:112, dur:'6m', region:'Left Heel', status:'New' },
-          { id:'a2', t:'08:26', peak:101, dur:'4m', region:'Sacrum',    status:'New' },
-          { id:'a3', t:'07:41', peak:95,  dur:'10m',region:'Right Hip', status:'Reviewed' }
-        ];
+            async function updateClinicianTrend() {
+                if (!window.SensorData || !window.Charts) return;
 
-        const ranges = {
-          '1h':  { labels:['-60','-45','-30','-15','Now'],  peak:[90,96,84,110,98], area:[62,64,60,58,63] },
-          '6h':  { labels:['-6h','-5h','-4h','-3h','-2h','-1h','Now'], peak:[80,91,86,92,98,94,96], area:[61,60,63,59,62,64,65] },
-          '24h': { labels:['-24','-18','-12','-6','Now'],   peak:[70,85,102,97,94], area:[58,60,63,61,66] },
-          '7d':  { labels:['-7d','-5d','-3d','-1d','Now'], peak:[72,88,91,96,93],  area:[58,60,61,64,65] }
-        };
+                const selPatient = document.getElementById("selPatient");
+                const selRange = document.getElementById("clinRange");
+                const canvas = document.getElementById("clinTrendChart");
+                const subtitle = document.getElementById("clinTrendSubtitle");
+                const flagList = document.getElementById("flagList");
 
-        let activeRange = '1h';
-        let charts = {};
-        let notes = [];
+                if (!selPatient || !canvas) return;
 
-        // ---------------------------
-        // UI helpers
-        // ---------------------------
-        function riskBadge(risk){
-          if(risk.includes('High')) return '<span class="badge text-bg-warning">High</span>';
-          if(risk.includes('Needs'))return '<span class="badge text-bg-primary">Needs review</span>';
-          return '<span class="badge text-bg-success">Stable</span>';
-        }
+                const pid = selPatient.value;
+                if (!pid) {
+                    if (clinChart) { clinChart.destroy(); clinChart = null; }
+                    if (subtitle) subtitle.textContent = "Select a patient to view their sessions";
+                    if (flagList) {
+                        flagList.innerHTML = '<li class="list-group-item text-muted">Select a patient to see recent high-risk sessions.</li>';
+                    }
+                    return;
+                }
 
-        function renderPatients(list){
-          const q = (document.getElementById('patientSearch').value || '').toLowerCase();
-          const grid = document.getElementById('patientsGrid');
-          grid.innerHTML = '';
-          list.filter(p=>!q || p.name.toLowerCase().includes(q))
-              .forEach(p=>{
-                const col = document.createElement('div');
-                col.className = 'col-12 col-sm-6 col-xl-3';
-                col.innerHTML = `
-                  <div class="feature h-100">
-                    <div class="d-flex align-items-start justify-content-between">
-                      <div>
-                        <div class="fw-semibold">${p.name}</div>
-                        <div class="small text-muted">Room ${p.room}</div>
-                      </div>
-                      ${riskBadge(p.risk)}
-                    </div>
-                    <div class="mt-2 small text-muted">Last reading ${p.last} · Peak ${p.peak} mmHg</div>
-                    <div class="d-flex gap-2 mt-3">
-                      <button class="btn btn-outline-primary btn-sm" onclick="selectPatient('${p.id}')">Open</button>
-                      <button class="btn btn-primary btn-sm" onclick="quickReport('${p.id}')"><i class="bi bi-download"></i></button>
-                    </div>
-                  </div>`;
-                grid.appendChild(col);
-              });
-        }
+                const metrics = await SensorData.loadPatientMetrics(pid);
+                if (!metrics) {
+                    if (subtitle) subtitle.textContent = "No sessions found for selected patient.";
+                    return;
+                }
 
-        function selectPatient(id){
-          // For demo, just highlight and refresh charts
-          const p = demoPatients.find(x=>x.id===id);
-          if(!p) return;
-          // Show a toast-like message
-          console.log('Selected patient:', p.name);
-          // You could set patient-specific datasets here if desired
-          updateCharts();
-        }
+                const rangeKey = selRange ? selRange.value : "24h";
+                const sliced = SensorData.sliceByRange(metrics, rangeKey);
 
-        function renderAlerts(){
-          const tbody = document.querySelector('#tblAlerts tbody');
-          tbody.innerHTML = '';
-          demoAlerts.forEach(a=>{
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td><input type="checkbox" class="chkAlert" data-id="${a.id}"/></td>
-              <td>${a.t}</td>
-              <td>${a.peak} mmHg</td>
-              <td>${a.dur}</td>
-              <td>${a.region}</td>
-              <td><span class="badge ${a.status==='Reviewed'?'text-bg-success':'text-bg-warning'}">${a.status}</span></td>`;
-            tbody.appendChild(tr);
-          });
-        }
+                if (clinChart) clinChart.destroy();
+                clinChart = Charts.mkCompareChart(
+                    canvas.getContext("2d"),
+                    sliced.labels,
+                    sliced.ppi,
+                    sliced.contact,
+                    "Peak Pressure Index",
+                    "Contact Area %"
+                );
 
-        function markSelected(status){
-          const ids = Array.from(document.querySelectorAll('.chkAlert:checked')).map(x=>x.dataset.id);
-          demoAlerts.forEach(a=>{ if(ids.includes(a.id)) a.status = status; });
-          renderAlerts();
-          updateReportKPIs();
-          document.getElementById('checkAll').checked = false;
-        }
+                if (subtitle) {
+                    subtitle.textContent = `${metrics.patientName} · ${sliced.labels.length} sessions`;
+                }
 
-        function updateReportKPIs(){
-          const reviewed = demoAlerts.filter(a=>a.status==='Reviewed').length;
-          const pending  = demoAlerts.length - reviewed;
-          document.getElementById('repReviewed').innerText = reviewed;
-          document.getElementById('repPending').innerText  = `${pending} pending`;
-          // Peak/Area from current range (use last point)
-          const d = ranges[activeRange];
-          const peak = d.peak[d.peak.length-1];
-          const area = d.area[d.area.length-1];
-          document.getElementById('repPeak').innerText = `${peak} mmHg`;
-          document.getElementById('repArea').innerText = `${area}%`;
-          document.getElementById('repPeakTrend').innerText = (peak - 90 >= 0 ? '+' : '') + (peak-90) + ' vs baseline';
-          document.getElementById('repAreaTrend').innerText = (area - 60 >= 0 ? '+' : '') + (area-60) + '% vs baseline';
-        }
+                // Build risk flags from ALL metrics, not just sliced, so clinician sees overall pattern
+                if (flagList) {
+                    flagList.innerHTML = "";
 
-        function exportCsv(){
-          const rows = [
-            ['Metric','Value'],
-            ['Peak Pressure (current)', ranges[activeRange].peak.slice(-1)[0]],
-            ['Contact Area % (current)', ranges[activeRange].area.slice(-1)[0]],
-            ['Alerts Reviewed', demoAlerts.filter(a=>a.status==='Reviewed').length],
-            ['Alerts Pending', demoAlerts.filter(a=>a.status!=='Reviewed').length],
-          ];
-          const csv = rows.map(r=>r.join(',')).join('\n');
-          const url = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
-          const a = Object.assign(document.createElement('a'), { href:url, download:'patient-summary.csv' });
-          document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-        }
+                    const anyHigh = metrics.labels.some((label, idx) => {
+                        const ppi = metrics.ppiSeries[idx];
+                        const contact = metrics.contactSeries[idx];
 
-        function fakePdf(){
-          alert('PDF generation demo – wire to server-side later if needed.');
-        }
+                        const isHigh = (ppi >= 220 || contact >= 70);
+                        const isModerate = !isHigh && (ppi > 20 || contact > 10);
 
-        // ---------------------------
-        // Charts
-        // ---------------------------
-        function buildCharts(){
-          const tick = getComputedStyle(document.documentElement).getPropertyValue('--chart-tick').trim() || '#cbd5e1';
-          const grid = getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim() || 'rgba(255,255,255,.06)';
-          const common = {
-            plugins:{ legend:{ display:false } },
-            scales:{
-              x:{ grid:{ color:grid }, ticks:{ color:tick }},
-              y:{ grid:{ color:grid }, ticks:{ color:tick }}
+                        if (!isHigh && !isModerate) return false;
+
+                        const li = document.createElement("li");
+                        li.className = "list-group-item d-flex justify-content-between align-items-center";
+
+                        let tag = "";
+                        let badgeClass = "";
+
+                        if (isHigh) {
+                            tag = "High risk";
+                            badgeClass = "badge rounded-pill text-bg-danger";
+                        } else {
+                            tag = "Monitor";
+                            badgeClass = "badge rounded-pill text-bg-warning text-dark";
+                        }
+
+                        li.innerHTML = `
+                            <div>
+                                <div class="fw-semibold small">${label}</div>
+                                <div class="small text-muted">
+                                    PPI: ${ppi.toFixed(0)} · Contact: ${contact.toFixed(1)}%
+                                </div>
+                            </div>
+                            <span class="${badgeClass}">${tag}</span>
+                        `;
+
+                        flagList.appendChild(li);
+                        return isHigh;
+                    });
+
+                    if (!anyHigh && flagList.children.length === 0) {
+                        const li = document.createElement("li");
+                        li.className = "list-group-item text-muted";
+                        li.textContent = "No high-risk sessions detected in the loaded history.";
+                        flagList.appendChild(li);
+                    }
+                }
             }
-          };
 
-          charts.peak = new Chart(document.getElementById('chartPeak'), {
-            type:'line',
-            data:{ labels:ranges[activeRange].labels,
-                   datasets:[{ label:'Peak Pressure', data:ranges[activeRange].peak, fill:true,
-                                borderColor:'#5b7cfa', backgroundColor:'rgba(91,124,250,.18)', tension:.35 }]},
-            options: common
-          });
+            function initClinicianPage() {
+                if (!window.SensorData) return;
 
-          charts.area = new Chart(document.getElementById('chartArea'), {
-            type:'line',
-            data:{ labels:ranges[activeRange].labels,
-                   datasets:[{ label:'Contact Area %', data:ranges[activeRange].area, fill:true,
-                                borderColor:'#4de2c2', backgroundColor:'rgba(77,226,194,.18)', tension:.35 }]},
-            options: common
-          });
+                const selPatient = document.getElementById("selPatient");
+                const selRange = document.getElementById("clinRange");
 
-          charts.comp = new Chart(document.getElementById('chartTrendCompare'), {
-            type:'bar',
-            data:{
-              labels:['T-60','T-45','T-30','T-15','Now'],
-              datasets:[
-                { label:'This Hour', data:[92,96,88,99,95], backgroundColor:'rgba(91,124,250,.55)', borderRadius:8 },
-                { label:'Same Hour Yesterday', data:[85,90,82,92,89], backgroundColor:'rgba(77,226,194,.45)', borderRadius:8 }
-              ]
-            },
-            options:{
-              plugins:{ legend:{ labels:{ color:tick } } },
-              scales:{ x:{ grid:{ color:grid }, ticks:{ color:tick } }, y:{ grid:{ color:grid }, ticks:{ color:tick } } }
+                // Populate patient dropdown from SENSOR_INDEX
+                if (selPatient && selPatient.options.length <= 1) {
+                    for (const [id, meta] of Object.entries(SensorData.SENSOR_INDEX.patients)) {
+                        const opt = document.createElement("option");
+                        opt.value = id;
+                        opt.textContent = `${meta.name} (${id})`;
+                        selPatient.appendChild(opt);
+                    }
+                }
+
+                if (selPatient) selPatient.addEventListener("change", updateClinicianTrend);
+                if (selRange) selRange.addEventListener("change", updateClinicianTrend);
             }
-          });
-        }
 
-        function updateCharts(){
-          charts.peak.data.labels = ranges[activeRange].labels;
-          charts.peak.data.datasets[0].data = ranges[activeRange].peak;
-          charts.peak.update();
+            // Simple "add note" handler for the notes card
+            window.UI = window.UI || {};
+            window.UI.addClinNote = function (e) {
+                e.preventDefault();
+                const input = document.getElementById("clinNoteInput");
+                const thread = document.getElementById("clinThread");
+                if (!input || !thread) return false;
 
-          charts.area.data.labels = ranges[activeRange].labels;
-          charts.area.data.datasets[0].data = ranges[activeRange].area;
-          charts.area.update();
+                const text = input.value.trim();
+                if (!text) return false;
 
-          // keep compare chart as-is for demo
-        }
+                const wrapper = document.createElement("div");
+                wrapper.className = "d-flex align-items-start mb-3 comment";
+                wrapper.innerHTML = `
+                    <div class="avatar me-2">C</div>
+                    <div class="bubble">
+                        <div class="small fw-semibold">You</div>
+                        <div class="small text-muted mb-1">Just now</div>
+                        <div class="small">${text}</div>
+                    </div>
+                `;
+                thread.prepend(wrapper);
+                input.value = "";
+                return false;
+            };
 
-        // ---------------------------
-        // Notes
-        // ---------------------------
-        function addNote(e){
-          e.preventDefault();
-          const f = document.getElementById('noteFrom').value;
-          const t = document.getElementById('noteTo').value;
-          const txt = document.getElementById('noteText').value.trim();
-          if(!txt) return;
-          notes.push({ f, t, txt, at: new Date().toLocaleString() });
-          document.getElementById('noteText').value='';
-          renderNotes();
-        }
-        function renderNotes(){
-          const ul = document.getElementById('notesList');
-          ul.innerHTML = notes.length ? '' : '<li class="list-group-item bg-transparent text-muted">No notes yet.</li>';
-          notes.slice().reverse().forEach(n=>{
-            const li = document.createElement('li');
-            li.className = 'list-group-item bg-transparent text-light border-secondary';
-            li.innerHTML = `<div class="d-flex justify-content-between"><strong>${n.f || 'Start'} → ${n.t || 'End'}</strong><span class="small text-muted">${n.at}</span></div><div class="small mt-1">${n.txt}</div>`;
-            ul.appendChild(li);
-          });
-        }
-
-        // ---------------------------
-        // Wire up UI
-        // ---------------------------
-        document.addEventListener('DOMContentLoaded', () => {
-          renderPatients(demoPatients);
-          renderAlerts();
-          buildCharts();
-          updateReportKPIs();
-
-          document.querySelectorAll('.btn-group [data-range]').forEach(btn=>{
-            btn.addEventListener('click', (e)=>{
-              document.querySelectorAll('.btn-group [data-range]').forEach(b=>b.classList.remove('active'));
-              e.target.classList.add('active');
-              activeRange = e.target.dataset.range;
-              updateCharts();
-              updateReportKPIs();
-            });
-          });
-
-          document.getElementById('patientSearch').addEventListener('input', () => renderPatients(demoPatients));
-          document.getElementById('checkAll').addEventListener('change', (e)=>{
-            document.querySelectorAll('.chkAlert').forEach(c=>c.checked = e.target.checked);
-          });
-
-          document.getElementById('btnMarkReviewed').addEventListener('click', ()=>markSelected('Reviewed'));
-          document.getElementById('btnRequireFollow').addEventListener('click', ()=>markSelected('Requires Follow-Up'));
-
-          document.getElementById('noteForm').addEventListener('submit', addNote);
-          document.getElementById('btnExportCsv').addEventListener('click', exportCsv);
-          document.getElementById('btnExportPdf').addEventListener('click', fakePdf);
-        });
-
-        function quickReport(patientId){
-          exportCsv(); // simple reuse for demo
-        }
+            document.addEventListener("DOMContentLoaded", initClinicianPage);
+        })();
     </script>
 }

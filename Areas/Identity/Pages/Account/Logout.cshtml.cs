@@ -1,14 +1,7 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
-// The .NET Foundation licenses this file to you under the MIT license.
-#nullable disable
-
-using System;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authorization;
+﻿#nullable disable
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.Extensions.Logging;
 
 namespace UiOnlyApp.Areas.Identity.Pages.Account
 {
@@ -23,20 +16,24 @@ namespace UiOnlyApp.Areas.Identity.Pages.Account
             _logger = logger;
         }
 
+        // Handle GET logout (if user navigates directly)
+        public async Task<IActionResult> OnGet()
+        {
+            await _signInManager.SignOutAsync();
+            _logger.LogInformation("User logged out (GET).");
+
+            // ALWAYS redirect to login page
+            return RedirectToPage("./Login");
+        }
+
+        // Handle POST logout (normal logout button)
         public async Task<IActionResult> OnPost(string returnUrl = null)
         {
             await _signInManager.SignOutAsync();
-            _logger.LogInformation("User logged out.");
-            if (returnUrl != null)
-            {
-                return LocalRedirect(returnUrl);
-            }
-            else
-            {
-                // This needs to be a redirect so that the browser performs a new
-                // request and the identity for the user gets updated.
-                return RedirectToPage();
-            }
+            _logger.LogInformation("User logged out (POST).");
+
+            // ALWAYS redirect to login page
+            return RedirectToPage("./Login");
         }
     }
 }
