@@ -3,37 +3,56 @@
 }
 
 <div class="container py-4">
-    <!-- HEADER -->
+
+    <!-- HERO / INTRO -->
     <section class="mb-4">
-        <div class="hero-slab p-4 p-md-5 mb-3">
-            <div class="row align-items-center">
-                <div class="col-md-8">
+        <div class="hero-slab p-4 p-md-5 text-light d-flex flex-column justify-content-center">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+                <div>
                     <span class="badge text-bg-primary mb-3">Clinician view</span>
-                    <h1 class="display-6 mb-2">Patient monitoring workspace</h1>
-                    <p class="text-muted mb-3">
+                    <h1 class="display-6 mb-2">
+                        Patient monitoring workspace
+                    </h1>
+                    <p class="text-muted mb-0">
                         Review pressure mapping trends, spot high-risk sessions, and drill into individual
-                        patients’ heatmaps. All metrics are computed from the same sensor data used in the patient view.
+                        patients’ heatmaps. All metrics are computed from the same sensor data used in
+                        the patient view.
                     </p>
-                    <div class="d-flex flex-wrap gap-2 small text-muted">
-                        <span><i class="bi bi-people-fill me-1"></i>Multi-patient oversight</span>
-                        <span><i class="bi bi-bell me-1"></i>High-risk flags</span>
+                    <div class="mt-3 small text-muted">
+                        <i class="bi bi-people me-1"></i> Multi-patient oversight
+                        <span class="mx-2">•</span>
+                        <i class="bi bi-bell me-1"></i> High-risk flags
                     </div>
                 </div>
-                <div class="col-md-4 mt-4 mt-md-0 text-md-end">
-                    <div class="d-inline-flex flex-column align-items-md-end align-items-start gap-2 small">
-                        <div>
-                            <label class="form-label mb-1 small text-muted">Select patient</label>
-                            <select id="selPatient" class="form-select form-select-sm">
-                                <option value="">Choose patient…</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="form-label mb-1 small text-muted">Time window</label>
-                            <select id="clinRange" class="form-select form-select-sm">
-                                <option value="1h">Last 1h</option>
-                                <option value="6h">Last 6h</option>
-                                <option value="24h" selected>Last 24h</option>
-                            </select>
+
+                <div class="text-md-end small text-muted">
+                    <div class="mb-2">
+                        <div class="text-uppercase" style="letter-spacing:.12em;">Select patient</div>
+                        <select id="clinPatientSelect"
+                                class="form-select form-select-sm mt-1"
+                                style="min-width:210px;">
+                            <option value="">Choose patient...</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <div class="text-uppercase mb-1" style="letter-spacing:.12em;">Time window</div>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button"
+                                    class="btn btn-outline-secondary active"
+                                    data-clin-range="24">
+                                Last 24h
+                            </button>
+                            <button type="button"
+                                    class="btn btn-outline-secondary"
+                                    data-clin-range="72">
+                                3 days
+                            </button>
+                            <button type="button"
+                                    class="btn btn-outline-secondary"
+                                    data-clin-range="all">
+                                All
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -41,83 +60,111 @@
         </div>
     </section>
 
-    <!-- TOP ROW: TREND + HEATMAP -->
+    <!-- TREND + HEATMAP -->
     <section class="mb-4">
         <div class="row g-3">
-            <!-- Trend chart -->
+            <!-- Trend overview -->
             <div class="col-lg-7">
-                <div class="card shadow-sm rounded-4">
-                    <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
-                        <span>Trend overview</span>
-                        <span class="small text-muted" id="clinTrendSubtitle">
-                            Select a patient to view their sessions
-                        </span>
+                <div class="card shadow-sm h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-uppercase small text-muted mb-1">Trend overview</div>
+                            <div class="fw-semibold">Select a patient to view their sessions</div>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="ratio ratio-16x9">
                             <canvas id="clinTrendChart"></canvas>
                         </div>
-                        <p class="small text-muted mb-0 mt-2">
-                            Blue: <strong>Peak Pressure Index</strong> (max sensor pressure per session).<br />
-                            Green: <strong>Contact Area %</strong> (percentage of sensors above load threshold).
+                        <p class="small text-muted mt-3 mb-0">
+                            Blue: <span class="fw-semibold">Peak Pressure Index</span> (max sensor pressure per session).
+                            Green: <span class="fw-semibold">Contact Area %</span> (percentage of sensors above load threshold).
                         </p>
                     </div>
                 </div>
             </div>
 
-            <!-- Heatmap for selected patient -->
+            <!-- Heatmap -->
             <div class="col-lg-5">
-                @await Html.PartialAsync("_Heatmap")
+                <div class="card heatmap-card shadow-sm h-100">
+                    <div class="card-header fw-semibold d-flex align-items-center gap-2">
+                        <i class="bi bi-grid-3x3-gap-fill text-primary me-2"></i>
+                        <span>Pressure Map</span>
+
+                        <div class="ms-auto d-flex flex-wrap gap-2 align-items-center">
+                            <select id="clinHmDate" class="form-select form-select-sm" style="min-width:140px;">
+                                <option value="">Date...</option>
+                            </select>
+
+                            <select id="clinHmPalette" class="form-select form-select-sm">
+                                <option value="default">Default Palette</option>
+                                <option value="warm">Warm Gradient</option>
+                                <option value="cool">Cool Gradient</option>
+                                <option value="contrast">High Contrast</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-0 d-flex flex-column">
+                        <div class="heatmap-wrap ratio ratio-1x1">
+                            <canvas id="clinHeatmapCanvas"></canvas>
+                        </div>
+
+                        <!-- KPI row under heatmap -->
+                        <div class="d-flex flex-wrap justify-content-between gap-3 px-3 pt-3 pb-2 small">
+                            <div>
+                                <div class="text-muted text-uppercase" style="font-size:.7rem;letter-spacing:.12em;">
+                                    Peak Pressure Index
+                                </div>
+                                <div id="clinHmPpi" class="fw-bold">—</div>
+                            </div>
+                            <div>
+                                <div class="text-muted text-uppercase" style="font-size:.7rem;letter-spacing:.12em;">
+                                    Contact Area %
+                                </div>
+                                <div id="clinHmContact" class="fw-bold">—</div>
+                            </div>
+                            <div>
+                                <div class="text-muted text-uppercase" style="font-size:.7rem;letter-spacing:.12em;">
+                                    Status
+                                </div>
+                                <div id="clinHmStatus" class="fw-bold">—</div>
+                            </div>
+                        </div>
+
+                        <div class="px-3 pb-3 small text-muted" id="clinHmStatusText">
+                            Select a patient and date to load a session heatmap.
+                        </div>
+                    </div>
+
+                    <div class="card-footer small d-flex justify-content-between text-muted">
+                        <span id="clinHmSessionCaption">—</span>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- BOTTOM ROW: FLAGS + NOTES -->
-    <section>
+    <!-- Lower panels (risk flags / notes) – keep your existing content here if you have it -->
+    <section class="mb-4">
         <div class="row g-3">
-            <!-- Risk flags -->
             <div class="col-lg-6">
-                <div class="card shadow-sm rounded-4">
-                    <div class="card-header fw-semibold">
-                        Risk flags
+                <div class="card">
+                    <div class="card-header">
+                        <span class="fw-semibold">Risk flags</span>
                     </div>
-                    <div class="card-body p-0">
-                        <ul id="flagList" class="list-group list-group-flush small">
-                            <li class="list-group-item text-muted">
-                                Select a patient to see recent high-risk sessions.
-                            </li>
-                        </ul>
+                    <div class="card-body small text-muted">
+                        Select a patient to see recent high-risk sessions.
                     </div>
                 </div>
             </div>
 
-            <!-- Clinician notes / comments -->
             <div class="col-lg-6">
-                <div class="card shadow-sm rounded-4">
-                    <div class="card-header fw-semibold">
-                        Clinician notes
-                    </div>
-                    <div class="card-body" id="clinThread">
-                        <div class="d-flex align-items-start mb-3 comment">
-                            <div class="avatar me-2">C</div>
-                            <div class="bubble">
-                                <div class="small fw-semibold">Dr. Patel</div>
-                                <div class="small text-muted mb-1">Today, 09:14</div>
-                                <div class="small">
-                                    Use this space to record your observations for each patient’s pressure profile,
-                                    including posture advice and follow-up actions.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-footer">
-                        <form class="d-flex gap-2" onsubmit="return UI && UI.addClinNote && UI.addClinNote(event);">
-                            <input type="text" class="form-control form-control-sm" id="clinNoteInput"
-                                   placeholder="Add a note about this patient…" />
-                            <button type="submit" class="btn btn-primary btn-sm">
-                                <i class="bi bi-send"></i>
-                            </button>
-                        </form>
+                <div class="card">
+                    <div class="card-header fw-semibold">Clinician notes</div>
+                    <div class="card-body small text-muted">
+                        Use this space to record your observations for each patient’s pressure profile,
+                        including posture advice and follow-up actions.
                     </div>
                 </div>
             </div>
@@ -126,156 +173,7 @@
 </div>
 
 @section Scripts {
-    <!-- Chart.js is already in _Layout, but safe to include again if needed -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Page-specific helpers for charts + heatmap -->
     <script src="~/js/charts.js" asp-append-version="true"></script>
-    <script src="~/js/sensor-metrics.js" asp-append-version="true"></script>
-
-    <script>
-        (function () {
-            let clinChart = null;
-
-            async function updateClinicianTrend() {
-                if (!window.SensorData || !window.Charts) return;
-
-                const selPatient = document.getElementById("selPatient");
-                const selRange = document.getElementById("clinRange");
-                const canvas = document.getElementById("clinTrendChart");
-                const subtitle = document.getElementById("clinTrendSubtitle");
-                const flagList = document.getElementById("flagList");
-
-                if (!selPatient || !canvas) return;
-
-                const pid = selPatient.value;
-                if (!pid) {
-                    if (clinChart) { clinChart.destroy(); clinChart = null; }
-                    if (subtitle) subtitle.textContent = "Select a patient to view their sessions";
-                    if (flagList) {
-                        flagList.innerHTML = '<li class="list-group-item text-muted">Select a patient to see recent high-risk sessions.</li>';
-                    }
-                    return;
-                }
-
-                const metrics = await SensorData.loadPatientMetrics(pid);
-                if (!metrics) {
-                    if (subtitle) subtitle.textContent = "No sessions found for selected patient.";
-                    return;
-                }
-
-                const rangeKey = selRange ? selRange.value : "24h";
-                const sliced = SensorData.sliceByRange(metrics, rangeKey);
-
-                if (clinChart) clinChart.destroy();
-                clinChart = Charts.mkCompareChart(
-                    canvas.getContext("2d"),
-                    sliced.labels,
-                    sliced.ppi,
-                    sliced.contact,
-                    "Peak Pressure Index",
-                    "Contact Area %"
-                );
-
-                if (subtitle) {
-                    subtitle.textContent = `${metrics.patientName} · ${sliced.labels.length} sessions`;
-                }
-
-                // Build risk flags from ALL metrics, not just sliced, so clinician sees overall pattern
-                if (flagList) {
-                    flagList.innerHTML = "";
-
-                    const anyHigh = metrics.labels.some((label, idx) => {
-                        const ppi = metrics.ppiSeries[idx];
-                        const contact = metrics.contactSeries[idx];
-
-                        const isHigh = (ppi >= 220 || contact >= 70);
-                        const isModerate = !isHigh && (ppi > 20 || contact > 10);
-
-                        if (!isHigh && !isModerate) return false;
-
-                        const li = document.createElement("li");
-                        li.className = "list-group-item d-flex justify-content-between align-items-center";
-
-                        let tag = "";
-                        let badgeClass = "";
-
-                        if (isHigh) {
-                            tag = "High risk";
-                            badgeClass = "badge rounded-pill text-bg-danger";
-                        } else {
-                            tag = "Monitor";
-                            badgeClass = "badge rounded-pill text-bg-warning text-dark";
-                        }
-
-                        li.innerHTML = `
-                            <div>
-                                <div class="fw-semibold small">${label}</div>
-                                <div class="small text-muted">
-                                    PPI: ${ppi.toFixed(0)} · Contact: ${contact.toFixed(1)}%
-                                </div>
-                            </div>
-                            <span class="${badgeClass}">${tag}</span>
-                        `;
-
-                        flagList.appendChild(li);
-                        return isHigh;
-                    });
-
-                    if (!anyHigh && flagList.children.length === 0) {
-                        const li = document.createElement("li");
-                        li.className = "list-group-item text-muted";
-                        li.textContent = "No high-risk sessions detected in the loaded history.";
-                        flagList.appendChild(li);
-                    }
-                }
-            }
-
-            function initClinicianPage() {
-                if (!window.SensorData) return;
-
-                const selPatient = document.getElementById("selPatient");
-                const selRange = document.getElementById("clinRange");
-
-                // Populate patient dropdown from SENSOR_INDEX
-                if (selPatient && selPatient.options.length <= 1) {
-                    for (const [id, meta] of Object.entries(SensorData.SENSOR_INDEX.patients)) {
-                        const opt = document.createElement("option");
-                        opt.value = id;
-                        opt.textContent = `${meta.name} (${id})`;
-                        selPatient.appendChild(opt);
-                    }
-                }
-
-                if (selPatient) selPatient.addEventListener("change", updateClinicianTrend);
-                if (selRange) selRange.addEventListener("change", updateClinicianTrend);
-            }
-
-            // Simple "add note" handler for the notes card
-            window.UI = window.UI || {};
-            window.UI.addClinNote = function (e) {
-                e.preventDefault();
-                const input = document.getElementById("clinNoteInput");
-                const thread = document.getElementById("clinThread");
-                if (!input || !thread) return false;
-
-                const text = input.value.trim();
-                if (!text) return false;
-
-                const wrapper = document.createElement("div");
-                wrapper.className = "d-flex align-items-start mb-3 comment";
-                wrapper.innerHTML = `
-                    <div class="avatar me-2">C</div>
-                    <div class="bubble">
-                        <div class="small fw-semibold">You</div>
-                        <div class="small text-muted mb-1">Just now</div>
-                        <div class="small">${text}</div>
-                    </div>
-                `;
-                thread.prepend(wrapper);
-                input.value = "";
-                return false;
-            };
-
-            document.addEventListener("DOMContentLoaded", initClinicianPage);
-        })();
-    </script>
+    <script src="~/js/heatmap.js" asp-append-version="true"></script>
 }

@@ -38,6 +38,31 @@
         </div>
     </section>
 
+    <!-- PRESSURE THRESHOLD (My Pressure Dashboard) -->
+    <section class="mb-4">
+        <div class="card hero-slab">
+            <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div>
+                    <h2 class="h5 mb-1">My Pressure Dashboard</h2>
+                    <div class="small text-muted">
+                        Alerts trigger when peak pressure exceeds your limit.
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <label class="small text-muted mb-0 me-1">Max pressure (mmHg)</label>
+                    <input id="maxPressureInput"
+                           type="number"
+                           class="form-control form-control-sm"
+                           style="width: 80px;"
+                           value="220" />
+                    <button id="btnSaveThreshold" class="btn btn-primary btn-sm">
+                        <i class="bi bi-save me-1"></i>Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- KPI STRIP -->
     <section class="mb-4">
         <div class="row g-3">
@@ -200,12 +225,39 @@
             </div>
         </div>
     </section>
+
+    <!-- FEEDBACK / COMMENTS -->
+    <section class="mb-5">
+        <div class="card">
+            <div class="card-header fw-semibold">
+                My feedback (linked to current session)
+            </div>
+            <div class="card-body" id="commentsThread">
+                <div class="small text-muted">
+                    No comments yet. Add one below.
+                </div>
+            </div>
+            <div class="card-footer">
+                <form id="commentForm" class="d-flex gap-2">
+                    <input type="text"
+                           id="commentInput"
+                           class="form-control"
+                           placeholder="Describe discomfort, posture, or mat issues..." />
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send me-1"></i>
+                        Send (tags current session)
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
 </div>
 
 @section Scripts {
     <!-- Re-use your existing helpers -->
     <script src="~/js/charts.js" asp-append-version="true"></script>
     <script src="~/js/heatmap.js" asp-append-version="true"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
 
     <script>
         // ----- Context from server -----
@@ -260,17 +312,52 @@
         const SENSOR_BASE_URL = "/sensor-data/";
         const BASELINE_VALUE = 1;
         const CONTACT_THRESHOLD = 5;
-        const ALERT_PPI_THRESHOLD = 220;
         const ALERT_AREA_THRESHOLD = 70;
         const ROWS_PER_FRAME = 32;
         const COLS_PER_FRAME = 32;
         const MAX_FRAMES = 300;          // play first 300 frames
         const FRAME_DURATION_MS = 33;    // ~30fps, 10s for 300 frames
 
+        // Threshold is user-configurable; default 220
+        let ALERT_PPI_THRESHOLD = 220;
+
         document.addEventListener("DOMContentLoaded", () => {
+            setupThreshold();
             initPatientDashboard();
+            setupComments();
         });
 
+        // ==========================
+        // 1) Threshold persistence
+        // ==========================
+        function setupThreshold() {
+            const input = document.getElementById('maxPressureInput');
+            const btnSave = document.getElementById('btnSaveThreshold');
+            if (!input || !btnSave) return;
+
+            const patientKey = PATIENT_ID || 'anon';
+            const STORAGE_KEY = 'sensore:maxPpi:' + patientKey;
+
+            const saved = window.localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                input.value = saved;
+                ALERT_PPI_THRESHOLD = Number(saved);
+            }
+
+            btnSave.addEventListener('click', () => {
+                const v = Number(input.value);
+                if (!Number.isFinite(v) || v <= 0) {
+                    alert('Please enter a valid positive pressure value.');
+                    return;
+                }
+                window.localStorage.setItem(STORAGE_KEY, String(v));
+                ALERT_PPI_THRESHOLD = v;
+            });
+        }
+
+        // ==========================
+        // 2) Patient dashboard wiring
+        // ==========================
         async function initPatientDashboard() {
             const patientMeta = SENSOR_INDEX.patients[PATIENT_ID];
             const statusEl = document.getElementById("hmStatusText");
@@ -281,7 +368,7 @@
             }
 
             const hmDateSel = document.getElementById("hmDate");
-            const paletteSel = document.getElementById("hmPalette");
+            const hmPalette = document.getElementById("hmPalette");
             const hmCanvas = document.getElementById("heatmapCanvas");
             const hmKpiPpi = document.getElementById("hmKpiPpi");
             const hmKpiContact = document.getElementById("hmKpiContact");
@@ -356,7 +443,6 @@
             const contactSeries = labels.map(d => sessions[d].contactPct);
 
             const chartCtx = document.getElementById("trendChart").getContext("2d");
-            // Use the compare helper: blue = PPI, green = Contact %
             const trendChart = Charts.mkCompareChart(
                 chartCtx,
                 labels,
@@ -494,7 +580,7 @@
             setSession(hmDateSel.value);
         }
 
-        // ---- CSV -> frames (array of flattened 32x32 frames) ----
+        // ----- CSV -> frames (array of flattened 32x32 frames) -----
         function parseCsvToFrames(csvText, maxFrames) {
             const lines = csvText.trim().split(/\r?\n/).filter(l => l.trim() !== "");
             const totalFrames = Math.min(Math.floor(lines.length / ROWS_PER_FRAME), maxFrames || Infinity);
@@ -517,7 +603,7 @@
             return frames;
         }
 
-        // ---- Session metrics (across all frames) ----
+        // ----- Session metrics (across all frames) -----
         function computeSessionMetrics(frames) {
             let maxVal = 0;
             let sumContactPct = 0;
@@ -577,11 +663,74 @@
         }
 
         function alertClassToBootstrap(cssClass) {
-            // convert text-success / text-warning / text-danger into badge-style color for the card
             if (cssClass.includes("danger")) return "text-danger";
             if (cssClass.includes("warning")) return "text-warning";
             if (cssClass.includes("success")) return "text-success";
             return "";
+        }
+
+        // ==========================
+        // 3) Comments per session
+        // ==========================
+        function setupComments() {
+            const form = document.getElementById('commentForm');
+            const input = document.getElementById('commentInput');
+            const thread = document.getElementById('commentsThread');
+            if (!form || !input || !thread) return;
+
+            const patientKey = PATIENT_ID || 'anon';
+            const STORAGE_KEY = 'sensore:comments:' + patientKey;
+
+            function loadComments() {
+                const json = window.localStorage.getItem(STORAGE_KEY);
+                return json ? JSON.parse(json) : [];
+            }
+
+            function saveComments(list) {
+                window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+            }
+
+            function renderComments() {
+                const list = loadComments();
+                thread.innerHTML = '';
+                if (!list.length) {
+                    thread.innerHTML = '<div class="small text-muted">No comments yet. Add one below.</div>';
+                    return;
+                }
+                list.forEach(function (c) {
+                    const row = document.createElement('div');
+                    row.className = 'mb-2 small';
+                    row.innerHTML =
+                        '<strong>' + c.date + '</strong> &middot; ' +
+                        '<span class="text-muted">' + (c.session || 'session') + '</span><br/>' +
+                        c.text;
+                    thread.appendChild(row);
+                });
+            }
+
+            renderComments();
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const text = input.value.trim();
+                if (!text) return;
+
+                const sessionDate = document.getElementById('hmDate')
+                    ? document.getElementById('hmDate').value || 'latest'
+                    : 'latest';
+
+                const entry = {
+                    date: new Date().toLocaleString(),
+                    session: sessionDate,
+                    text: text
+                };
+
+                const list = loadComments();
+                list.unshift(entry);
+                saveComments(list);
+                input.value = '';
+                renderComments();
+            });
         }
     </script>
 }

@@ -1,175 +1,663 @@
 ﻿// File: wwwroot/js/site.js
-// Global UI namespace
-window.UI = (() => {
+// Shared logic for Patient + Clinician dashboards
+// Requires: Chart.js, charts.js (window.Charts), heatmap.js (window.HeatmapSim)
 
-  // 🔐 Login form handler
-  function login(e) {
-    e.preventDefault();
-    const email = document.getElementById("loginEmail").value.trim();
-    const pass = document.getElementById("loginPass").value.trim();
+(function () {
+    // -----------------------------
+    // 0) Static sensor index (from your CSV list)
+    // -----------------------------
+    const SENSOR_INDEX = {
+        patients: {
+            "1c0fd777": {
+                name: "Michael Eton",
+                files: {
+                    "2025-10-11": "1c0fd777_20251011.csv",
+                    "2025-10-12": "1c0fd777_20251012.csv",
+                    "2025-10-13": "1c0fd777_20251013.csv"
+                }
+            },
+            "71e66ab3": {
+                name: "Jason Ghanian",
+                files: {
+                    "2025-10-11": "71e66ab3_20251011.csv",
+                    "2025-10-12": "71e66ab3_20251012.csv",
+                    "2025-10-13": "71e66ab3_20251013.csv"
+                }
+            },
+            "543d4676": {
+                name: "Alex Jenkins",
+                files: {
+                    "2025-10-11": "543d4676_20251011.csv",
+                    "2025-10-12": "543d4676_20251012.csv",
+                    "2025-10-13": "543d4676_20251013.csv"
+                }
+            },
+            "d13043b3": {
+                name: "Richard Afana",
+                files: {
+                    "2025-10-11": "d13043b3_20251011.csv",
+                    "2025-10-12": "d13043b3_20251012.csv",
+                    "2025-10-13": "d13043b3_20251013.csv"
+                }
+            },
+            "de0e9b2c": {
+                name: "De Luca",
+                files: {
+                    "2025-10-11": "de0e9b2c_20251011.csv",
+                    "2025-10-12": "de0e9b2c_20251012.csv",
+                    "2025-10-13": "de0e9b2c_20251013.csv"
+                }
+            }
+        }
+    };
 
-    if (!email || !pass) {
-      alert("Please enter both email and password.");
-      return false;
+    const SENSOR_BASE_URL = "/sensor-data/";
+
+    // thresholds + grid size
+    const BASELINE_VALUE = 1;
+    const CONTACT_THRESHOLD = 5;
+    const ALERT_PPI_THRESHOLD = 220;
+    const ALERT_AREA_THRESHOLD = 70;
+
+    const ROWS_PER_FRAME = 32;
+    const COLS_PER_FRAME = 32;
+    const MAX_FRAMES = 300;        // 300 * 33ms ≈ 10s video
+    const FRAME_DURATION_MS = 33;  // ~30fps
+
+    // cache sessions so Clinician view doesn't refetch constantly
+    const sessionCache = {}; // { patientId: { dateKey: { frames, ppi, contactPct, alert } } }
+
+    // -----------------------------
+    // 1) CSV helpers
+    // -----------------------------
+
+    function parseCsvToFrames(csvText, maxFrames) {
+        if (!csvText) return [];
+
+        const lines = csvText
+            .trim()
+            .split(/\r?\n/)
+            .filter(l => l.trim() !== "");
+
+        const totalFrames = Math.min(
+            Math.floor(lines.length / ROWS_PER_FRAME),
+            maxFrames || Infinity
+        );
+
+        const frames = [];
+
+        for (let f = 0; f < totalFrames; f++) {
+            const flat = [];
+            for (let r = 0; r < ROWS_PER_FRAME; r++) {
+                const line = lines[f * ROWS_PER_FRAME + r] || "";
+                const parts = line.split(/[,;\s]+/).filter(p => p.length > 0);
+
+                for (let c = 0; c < COLS_PER_FRAME; c++) {
+                    const v = Number(parts[c] ?? BASELINE_VALUE);
+                    flat.push(Number.isFinite(v) ? v : BASELINE_VALUE);
+                }
+            }
+            frames.push(flat);
+        }
+
+        return frames;
     }
 
-    // Demo only: redirect by role keyword
-    if (email.includes("clin")) window.location.href = "/Home/Clinician";
-    else if (email.includes("admin")) window.location.href = "/Home/Admin";
-    else window.location.href = "/Home/Patient";
-
-    return false;
-  }
-
-  // 👁️ Toggle password visibility
-  function togglePass(btn) {
-    const input = btn.previousElementSibling;
-    if (!input) return;
-    const isHidden = input.type === "password";
-    input.type = isHidden ? "text" : "password";
-    btn.innerHTML = `<i class="bi bi-eye${isHidden ? '-slash' : ''}"></i>`;
-  }
-
-  // 💬 Add comment (Patient)
-  function addComment(e) {
-    e.preventDefault();
-    const box = document.getElementById("commentInput");
-    const text = box.value.trim();
-    if (!text) return false;
-
-    const thread = document.getElementById("commentsThread");
-    const div = document.createElement("div");
-    div.className = "comment";
-    div.innerHTML = `
-      <div class="avatar patient">P</div>
-      <div class="bubble">
-        <div>${text}</div>
-        <div class="meta mt-1">You • just now</div>
-      </div>`;
-    thread.prepend(div);
-    box.value = "";
-    return false;
-  }
-
-  // 💬 Clinician reply
-  function replyClinician(e) {
-    e.preventDefault();
-    const box = document.getElementById("clinReply");
-    const text = box.value.trim();
-    if (!text) return false;
-
-    const thread = document.getElementById("clinThread");
-    const div = document.createElement("div");
-    div.className = "comment";
-    div.innerHTML = `
-      <div class="avatar clinician">C</div>
-      <div class="bubble">
-        <div>${text}</div>
-        <div class="meta mt-1">Clinician • just now</div>
-      </div>`;
-    thread.prepend(div);
-    box.value = "";
-    return false;
-  }
-
-  // 🧍 Create user (Admin)
-  function createUser(e) {
-    e.preventDefault();
-    const name = document.getElementById("newFullName").value.trim();
-    const email = document.getElementById("newEmail").value.trim();
-    const role = document.getElementById("newRole").value;
-    const group = document.getElementById("newGroup").value.trim() || "-";
-    if (!name || !email) return false;
-
-    const tbody = document.getElementById("tblUsers");
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${name}</td>
-      <td>${email}</td>
-      <td><span class="badge text-bg-primary">${role}</span></td>
-      <td>${group}</td>
-      <td class="text-end">
-        <button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">
-          <i class="bi bi-trash"></i>
-        </button>
-      </td>`;
-    tbody.appendChild(tr);
-
-    // Close modal
-    const modal = bootstrap.Modal.getInstance(document.getElementById("modalCreateUser"));
-    modal?.hide();
-    e.target.reset();
-    return false;
-  }
-
-  // Generate report (UI only)
-  function generateReport(e) {
-    e.preventDefault();
-    alert("Generating demo report...");
-    populateReport();
-    return false;
-  }
-
-  // 💾 Export report (PDF/CSV)
-  function exportReport(type) {
-    alert(`Exporting as ${type.toUpperCase()} (demo only)`);
-  }
-
-  // 📊 Populate dummy report data
-  function populateReport() {
-    const tbody = document.getElementById("tblReport");
-    if (!tbody) return;
-    tbody.innerHTML = "";
-
-    for (let i = 0; i < 10; i++) {
-      const row = document.createElement("tr");
-      row.innerHTML = `
-        <td>${new Date(Date.now() - i * 3600000).toLocaleString()}</td>
-        <td>${(Math.random() * 80 + 100).toFixed(1)}</td>
-        <td>${(Math.random() * 30 + 60).toFixed(1)}%</td>
-        <td>${Math.random() < 0.2 ? "⚠️" : ""}</td>`;
-      tbody.appendChild(row);
-    }
-    document.getElementById("repPeak").innerText = "180";
-    document.getElementById("repAvg").innerText = "112";
-    document.getElementById("repContact").innerText = "72%";
-    document.getElementById("repAlerts").innerText = "3";
-  }
-
-  // 🧠 Auto-demo injection (onload)
-  function init() {
-    // Populate admin demo users
-    const tbl = document.getElementById("tblUsers");
-    if (tbl) {
-      ["John Doe", "Jane Clin", "Admin One"].forEach((n, i) => {
-        const role = i === 2 ? "admin" : i === 1 ? "clinician" : "patient";
-        const email = `${n.split(" ")[0].toLowerCase()}@example.com`;
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${n}</td>
-          <td>${email}</td>
-          <td><span class="badge text-bg-primary">${role}</span></td>
-          <td>${i === 0 ? "Ward A" : "Ward B"}</td>
-          <td class="text-end">
-            <button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">
-              <i class="bi bi-trash"></i>
-            </button>
-          </td>`;
-        tbl.appendChild(tr);
-      });
+    function computePPI(frame) {
+        let maxVal = 0;
+        for (const v of frame) {
+            if (v > BASELINE_VALUE && v > maxVal) maxVal = v;
+        }
+        return maxVal;
     }
 
-    // Populate patients dropdown in reports
-    const sel = document.getElementById("repPatient");
-    if (sel) ["User-001", "User-002", "User-003"].forEach(u => {
-      const opt = document.createElement("option");
-      opt.textContent = u;
-      sel.appendChild(opt);
+    function computeContactAreaPct(frame, threshold) {
+        const total = frame.length || 1;
+        let count = 0;
+        for (const v of frame) {
+            if (v > threshold) count++;
+        }
+        return (count / total) * 100;
+    }
+
+    function computeSessionMetrics(frames) {
+        let maxPpi = 0;
+        let sumArea = 0;
+
+        for (const frame of frames) {
+            const ppi = computePPI(frame);
+            if (ppi > maxPpi) maxPpi = ppi;
+            sumArea += computeContactAreaPct(frame, CONTACT_THRESHOLD);
+        }
+
+        const meanArea = frames.length ? sumArea / frames.length : 0;
+
+        return { ppi: maxPpi, contactPct: meanArea };
+    }
+
+    function computeAlert(ppi, contactPct) {
+        if (ppi >= ALERT_PPI_THRESHOLD || contactPct >= ALERT_AREA_THRESHOLD) {
+            return { label: "High risk", cssClass: "text-danger" };
+        }
+        if (ppi > BASELINE_VALUE + 10 || contactPct > 10) {
+            return { label: "Monitor", cssClass: "text-warning" };
+        }
+        return { label: "Stable", cssClass: "text-success" };
+    }
+
+    function mapPalette(uiValue) {
+        switch (uiValue) {
+            case "warm": return "inferno";
+            case "cool": return "viridis";
+            case "contrast": return "gray";
+            case "default":
+            default: return "inferno";
+        }
+    }
+
+    function alertClassToBootstrap(cssClass) {
+        if (!cssClass) return "";
+        if (cssClass.includes("danger")) return "text-danger";
+        if (cssClass.includes("warning")) return "text-warning";
+        if (cssClass.includes("success")) return "text-success";
+        return "";
+    }
+
+    // -----------------------------
+    // 2) Data loading (per patient)
+    // -----------------------------
+
+    async function loadSessionsForPatient(patientId) {
+        if (sessionCache[patientId]) return sessionCache[patientId];
+
+        const meta = SENSOR_INDEX.patients[patientId];
+        if (!meta) return {};
+
+        const sessions = {};
+        const dates = Object.keys(meta.files).sort();
+
+        for (const dateKey of dates) {
+            const fileName = meta.files[dateKey];
+            const url = SENSOR_BASE_URL + fileName;
+
+            try {
+                const csv = await fetch(url).then(r => {
+                    if (!r.ok) throw new Error("HTTP " + r.status);
+                    return r.text();
+                });
+
+                const frames = parseCsvToFrames(csv, MAX_FRAMES);
+                if (!frames.length) continue;
+
+                const metrics = computeSessionMetrics(frames);
+                const alert = computeAlert(metrics.ppi, metrics.contactPct);
+
+                sessions[dateKey] = {
+                    frames,
+                    ppi: metrics.ppi,
+                    contactPct: metrics.contactPct,
+                    alert
+                };
+            } catch (err) {
+                console.error("Error loading session", url, err);
+            }
+        }
+
+        sessionCache[patientId] = sessions;
+        return sessions;
+    }
+
+    // -----------------------------
+    // 3) HeatmapPlayer helper (used by patient + clinician)
+    // -----------------------------
+
+    function HeatmapPlayer(opts) {
+        this.canvas = document.getElementById(opts.canvasId);
+        this.dateSelect = document.getElementById(opts.dateSelectId);
+        this.paletteSelect = document.getElementById(opts.paletteSelectId);
+        this.kpiPpi = document.getElementById(opts.kpiPpiId);
+        this.kpiContact = document.getElementById(opts.kpiContactId);
+        this.kpiStatus = document.getElementById(opts.kpiStatusId);
+        this.statusText = document.getElementById(opts.statusTextId);
+        this.caption = document.getElementById(opts.captionId);
+        this.playButton = opts.playBtnId ? document.getElementById(opts.playBtnId) : null;
+        this.slider = opts.sliderId ? document.getElementById(opts.sliderId) : null;
+        this.timeLabel = opts.timeLabelId ? document.getElementById(opts.timeLabelId) : null;
+
+        this.currentFrames = [];
+        this.currentDateKey = null;
+        this.playing = false;
+        this.timerId = null;
+
+        this.sessions = opts.sessions || {};
+        this.patientName = opts.patientName || "";
+    }
+
+    HeatmapPlayer.prototype.destroyTimer = function () {
+        if (this.timerId) {
+            clearInterval(this.timerId);
+            this.timerId = null;
+        }
+        this.playing = false;
+        if (this.playButton) {
+            this.playButton.innerHTML = '<i class="bi bi-play-fill"></i>';
+        }
+    };
+
+    HeatmapPlayer.prototype.renderFrame = function (index) {
+        if (!this.canvas || !this.currentFrames.length) return;
+        const frame = this.currentFrames[index];
+        const palName = mapPalette(this.paletteSelect ? this.paletteSelect.value : "default");
+
+        if (window.HeatmapSim && typeof HeatmapSim.drawHeatmap === "function") {
+            HeatmapSim.drawHeatmap(this.canvas, frame, palName);
+        } else {
+            // simple fallback
+            const SIZE = 32;
+            const ctx = this.canvas.getContext("2d");
+            const w = 256, h = 256;
+            this.canvas.width = w;
+            this.canvas.height = h;
+
+            const img = ctx.createImageData(SIZE, SIZE);
+            let min = Infinity, max = -Infinity;
+            for (const v of frame) {
+                if (v < min) min = v;
+                if (v > max) max = v;
+            }
+            const range = max - min || 1;
+
+            for (let i = 0; i < frame.length; i++) {
+                const t = (frame[i] - min) / range;
+                const r = Math.floor(255 * t);
+                const b = Math.floor(255 * (1 - t));
+                const g = Math.floor(80 + 50 * t);
+                const idx = i * 4;
+                img.data[idx] = r;
+                img.data[idx + 1] = g;
+                img.data[idx + 2] = b;
+                img.data[idx + 3] = 255;
+            }
+
+            const tmp = document.createElement("canvas");
+            tmp.width = SIZE;
+            tmp.height = SIZE;
+            tmp.getContext("2d").putImageData(img, 0, 0);
+
+            ctx.imageSmoothingEnabled = false;
+            ctx.clearRect(0, 0, w, h);
+            ctx.drawImage(tmp, 0, 0, w, h);
+        }
+    };
+
+    HeatmapPlayer.prototype.setSession = function (dateKey) {
+        const session = this.sessions[dateKey];
+        if (!session) return;
+
+        this.currentDateKey = dateKey;
+        this.currentFrames = session.frames;
+        if (this.slider) this.slider.value = 0;
+
+        if (this.kpiPpi) this.kpiPpi.textContent = session.ppi.toFixed(0);
+        if (this.kpiContact) this.kpiContact.textContent = session.contactPct.toFixed(1) + " %";
+        if (this.kpiStatus) {
+            this.kpiStatus.textContent = session.alert.label;
+            this.kpiStatus.className = "fw-bold " + session.alert.cssClass;
+        }
+
+        if (this.statusText) {
+            this.statusText.textContent = `${this.patientName} • ${dateKey}`;
+        }
+        if (this.caption) {
+            this.caption.textContent = `${this.patientName} • ${dateKey}`;
+        }
+
+        this.renderFrame(0);
+
+        const totalT = this.currentFrames.length * FRAME_DURATION_MS / 1000;
+        if (this.timeLabel) {
+            this.timeLabel.textContent = `0.0s / ${totalT.toFixed(1)}s`;
+        }
+
+        if (this.playing) {
+            this.startPlayback();
+        }
+    };
+
+    HeatmapPlayer.prototype.startPlayback = function () {
+        if (!this.currentFrames.length || !this.slider) return;
+
+        this.destroyTimer();
+        const totalFrames = this.currentFrames.length;
+        this.slider.max = totalFrames - 1;
+
+        this.timerId = setInterval(() => {
+            let idx = Number(this.slider.value);
+            idx = (idx + 1) % totalFrames;
+            this.slider.value = idx;
+
+            this.renderFrame(idx);
+
+            if (this.timeLabel) {
+                const t = (idx + 1) * FRAME_DURATION_MS / 1000;
+                const totalT = totalFrames * FRAME_DURATION_MS / 1000;
+                this.timeLabel.textContent = `${t.toFixed(1)}s / ${totalT.toFixed(1)}s`;
+            }
+        }, FRAME_DURATION_MS);
+
+        this.playing = true;
+        if (this.playButton) {
+            this.playButton.innerHTML = '<i class="bi bi-pause-fill"></i>';
+        }
+    };
+
+    HeatmapPlayer.prototype.bindEvents = function () {
+        if (!this.canvas) return;
+
+        if (this.playButton) {
+            this.playButton.addEventListener("click", () => {
+                if (this.playing) {
+                    this.destroyTimer();
+                } else {
+                    this.startPlayback();
+                }
+            });
+        }
+
+        if (this.slider) {
+            this.slider.addEventListener("input", () => {
+                if (!this.currentFrames.length) return;
+                const idx = Number(this.slider.value);
+                this.renderFrame(idx);
+
+                if (this.timeLabel) {
+                    const t = (idx + 1) * FRAME_DURATION_MS / 1000;
+                    const totalT = this.currentFrames.length * FRAME_DURATION_MS / 1000;
+                    this.timeLabel.textContent = `${t.toFixed(1)}s / ${totalT.toFixed(1)}s`;
+                }
+            });
+        }
+
+        if (this.paletteSelect) {
+            this.paletteSelect.addEventListener("change", () => {
+                if (!this.currentFrames.length || !this.slider) return;
+                const idx = Number(this.slider.value);
+                this.renderFrame(idx);
+            });
+        }
+
+        if (this.dateSelect) {
+            this.dateSelect.addEventListener("change", () => {
+                this.destroyTimer();
+                const value = this.dateSelect.value;
+                if (value) {
+                    this.setSession(value);
+                }
+            });
+        }
+    };
+
+    // -----------------------------
+    // 4) Patient dashboard init
+    // -----------------------------
+
+    async function initPatientDashboard() {
+        if (typeof PATIENT_ID === "undefined") return;
+        const patientId = PATIENT_ID;
+        const patientMeta = SENSOR_INDEX.patients[patientId];
+        if (!patientMeta) return;
+
+        const statusEl = document.getElementById("hmStatusText");
+        if (statusEl) statusEl.textContent = "Loading your sessions…";
+
+        const hmDateSel = document.getElementById("hmDate");
+        const trendCanvas = document.getElementById("trendChart");
+
+        const kpiOverallLabel = document.getElementById("kpiOverallLabel");
+        const kpiLatestPpi = document.getElementById("kpiLatestPpi");
+        const kpiLatestContact = document.getElementById("kpiLatestContact");
+
+        const sessions = await loadSessionsForPatient(patientId);
+        const dateKeys = Object.keys(sessions).sort();
+        if (!dateKeys.length) {
+            if (statusEl) statusEl.textContent = "No valid sessions were found for your account.";
+            return;
+        }
+
+        // Populate date drop-down
+        if (hmDateSel) {
+            hmDateSel.innerHTML = "";
+            for (const d of dateKeys) {
+                const opt = document.createElement("option");
+                opt.value = d;
+                opt.textContent = d;
+                hmDateSel.appendChild(opt);
+            }
+            hmDateSel.value = dateKeys[dateKeys.length - 1];
+        }
+
+        // KPIs from most recent session
+        const latest = sessions[dateKeys[dateKeys.length - 1]];
+        if (kpiLatestPpi) kpiLatestPpi.textContent = latest.ppi.toFixed(0);
+        if (kpiLatestContact) kpiLatestContact.textContent = latest.contactPct.toFixed(1) + " %";
+        if (kpiOverallLabel) {
+            kpiOverallLabel.textContent = latest.alert.label;
+            kpiOverallLabel.classList.add(alertClassToBootstrap(latest.alert.cssClass));
+        }
+
+        // Trend chart
+        if (trendCanvas && window.Charts && Charts.mkCompareChart) {
+            const labels = dateKeys;
+            const ppiSeries = labels.map(d => sessions[d].ppi);
+            const contactSeries = labels.map(d => sessions[d].contactPct);
+
+            const trendChart = Charts.mkCompareChart(
+                trendCanvas.getContext("2d"),
+                labels,
+                ppiSeries,
+                contactSeries,
+                "Peak Pressure Index",
+                "Contact Area %"
+            );
+
+            const rangeButtons = document.querySelectorAll('[data-range]');
+            rangeButtons.forEach(btn => {
+                btn.addEventListener("click", () => {
+                    rangeButtons.forEach(b => b.classList.remove("active"));
+                    btn.classList.add("active");
+
+                    const range = btn.getAttribute("data-range");
+                    let count = labels.length;
+                    if (range === "1") count = 1;
+                    else if (range === "6") count = Math.min(2, labels.length);
+                    else count = labels.length;
+
+                    const subLabels = labels.slice(-count);
+                    const subPpi = ppiSeries.slice(-count);
+                    const subContact = contactSeries.slice(-count);
+
+                    trendChart.data.labels = subLabels;
+                    trendChart.data.datasets[0].data = subPpi;
+                    trendChart.data.datasets[1].data = subContact;
+                    trendChart.update();
+                });
+            });
+        }
+
+        // Heatmap player for patient (with video controls)
+        const player = new HeatmapPlayer({
+            canvasId: "heatmapCanvas",
+            dateSelectId: "hmDate",
+            paletteSelectId: "hmPalette",
+            kpiPpiId: "hmKpiPpi",
+            kpiContactId: "hmKpiContact",
+            kpiStatusId: "hmKpiStatus",
+            statusTextId: "hmStatusText",
+            captionId: "hmSessionCaption",
+            playBtnId: "hmBtnPlay",
+            sliderId: "hmFrameSlider",
+            timeLabelId: "hmFrameTime",
+            sessions,
+            patientName: patientMeta.name
+        });
+
+        player.bindEvents();
+
+        if (statusEl) statusEl.textContent = "Ready. Playing latest session.";
+        player.setSession(hmDateSel ? hmDateSel.value : dateKeys[dateKeys.length - 1]);
+    }
+
+    // -----------------------------
+    // 5) Clinician dashboard init
+    // -----------------------------
+
+    async function initClinicianDashboard() {
+        // IDs as used in Clinician.cshtml
+        const selPatient = document.getElementById("clinPatientSelect");
+        const selDate = document.getElementById("clinHmDate");
+        const selPalette = document.getElementById("clinHmPalette");
+        const trendCanvas = document.getElementById("clinTrendChart");
+        const statusEl = document.getElementById("clinHmStatusText");
+
+        if (!selPatient || !selDate || !trendCanvas) return;
+
+        // populate patient list
+        selPatient.innerHTML = '<option value="">Choose patient...</option>';
+        for (const [id, meta] of Object.entries(SENSOR_INDEX.patients)) {
+            const opt = document.createElement("option");
+            opt.value = id;
+            opt.textContent = `${meta.name} (${id})`;
+            selPatient.appendChild(opt);
+        }
+
+        let currentPatientId = null;
+
+        // Heatmap player wired to clinician IDs (no playback controls)
+        const player = new HeatmapPlayer({
+            canvasId: "clinHeatmapCanvas",
+            dateSelectId: "clinHmDate",
+            paletteSelectId: "clinHmPalette",
+            kpiPpiId: "clinHmPpi",
+            kpiContactId: "clinHmContact",
+            kpiStatusId: "clinHmStatus",
+            statusTextId: "clinHmStatusText",
+            captionId: "clinHmSessionCaption",
+            playBtnId: null,
+            sliderId: null,
+            timeLabelId: null,
+            sessions: {},
+            patientName: ""
+        });
+
+        player.bindEvents();
+
+        selPatient.addEventListener("change", async () => {
+            const id = selPatient.value;
+            player.destroyTimer();
+            player.sessions = {};
+            currentPatientId = null;
+
+            if (!id) {
+                if (statusEl) statusEl.textContent = "Select a patient and date to load a session heatmap.";
+                selDate.innerHTML = '<option value="">Date...</option>';
+                const ctx = trendCanvas.getContext("2d");
+                ctx.clearRect(0, 0, trendCanvas.width, trendCanvas.height);
+                return;
+            }
+
+            currentPatientId = id;
+            const meta = SENSOR_INDEX.patients[id];
+            if (statusEl) statusEl.textContent = `Loading sessions for ${meta.name}…`;
+
+            const sessions = await loadSessionsForPatient(id);
+            player.sessions = sessions;
+            player.patientName = meta.name;
+
+            const dates = Object.keys(sessions).sort();
+            selDate.innerHTML = "";
+            for (const d of dates) {
+                const opt = document.createElement("option");
+                opt.value = d;
+                opt.textContent = d;
+                selDate.appendChild(opt);
+            }
+            if (!dates.length) {
+                selDate.innerHTML = '<option value="">No sessions</option>';
+                if (statusEl) statusEl.textContent = "No sessions for this patient.";
+                return;
+            }
+            selDate.value = dates[dates.length - 1];
+
+            // Trend chart for clinician
+            if (trendCanvas && window.Charts && Charts.mkCompareChart) {
+                const labels = dates;
+                const ppiSeries = labels.map(d => sessions[d].ppi);
+                const contactSeries = labels.map(d => sessions[d].contactPct);
+
+                const trendChart = Charts.mkCompareChart(
+                    trendCanvas.getContext("2d"),
+                    labels,
+                    ppiSeries,
+                    contactSeries,
+                    "Peak Pressure Index",
+                    "Contact Area %"
+                );
+
+                const rangeButtons = document.querySelectorAll('[data-clin-range]');
+                rangeButtons.forEach(btn => {
+                    btn.addEventListener("click", () => {
+                        rangeButtons.forEach(b => b.classList.remove("active"));
+                        btn.classList.add("active");
+
+                        const range = btn.getAttribute("data-clin-range");
+                        let count = labels.length;
+                        if (range === "1") count = 1;
+                        else if (range === "6") count = Math.min(2, labels.length);
+                        else count = labels.length;
+
+                        const subLabels = labels.slice(-count);
+                        const subPpi = ppiSeries.slice(-count);
+                        const subContact = contactSeries.slice(-count);
+
+                        trendChart.data.labels = subLabels;
+                        trendChart.data.datasets[0].data = subPpi;
+                        trendChart.data.datasets[1].data = subContact;
+                        trendChart.update();
+                    });
+                });
+            }
+
+            if (statusEl) statusEl.textContent = "Select a date to view the session heatmap.";
+            player.setSession(selDate.value);
+        });
+
+        selDate.addEventListener("change", () => {
+            const d = selDate.value;
+            if (!currentPatientId || !d) return;
+            player.destroyTimer();
+            player.setSession(d);
+        });
+
+        if (selPalette) {
+            selPalette.addEventListener("change", () => {
+                if (!player.currentFrames.length) return;
+                player.renderFrame(0);
+            });
+        }
+    }
+
+    // -----------------------------
+    // 6) Entry point
+    // -----------------------------
+    document.addEventListener("DOMContentLoaded", function () {
+        // Patient dashboard (Index)
+        if (typeof PATIENT_ID !== "undefined" && document.getElementById("trendChart")) {
+            initPatientDashboard();
+        }
+
+        // Clinician dashboard
+        if (document.getElementById("clinTrendChart")) {
+            initClinicianDashboard();
+        }
     });
-  }
-
-  // Run on DOM load
-  document.addEventListener("DOMContentLoaded", init);
-
-  return { login, togglePass, addComment, replyClinician, createUser, generateReport, exportReport };
 })();

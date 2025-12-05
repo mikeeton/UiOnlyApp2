@@ -14,3 +14,41 @@ de0e9b2c    | De Luca           | de.luca@patient.demo           | Demo123!
 
 Admin       | admin@example.com        | Admin123!
 Clinician   | clinician@example.com    | Clinician123!
+
+
+
+
+Quick wiring checklist
+
+
+_Layout.cshtml
+Change the <body> tag to include the patient id (it’s safe on non-patient pages, it’ll just be empty):
+<body data-patient-id="@User.FindFirst("PatientId")?.Value">
+
+
+
+Make sure you’re including scripts in _Layout.cshtml in this order:
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="~/js/charts.js" asp-append-version="true"></script>
+<script src="~/js/heatmap.js" asp-append-version="true"></script>
+<script src="~/js/site.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
+
+
+
+Once you drop this site.js in and add the data-patient-id attribute, your patient dashboard should:
+
+
+Play the heatmap as a video.
+
+
+Update KPIs and the trend chart from the same CSV metrics.
+
+
+Respect the user’s custom pressure threshold.
+
+
+Let them leave comments tied to a session date.
+
+

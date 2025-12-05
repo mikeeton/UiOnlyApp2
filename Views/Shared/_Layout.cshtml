@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 
-<body>
+<body data-patient-id="@User.FindFirst("PatientId")?.Value">
     <header>
         @await Html.PartialAsync("_Nav")
     </header>
@@ -27,8 +27,11 @@
         © @DateTime.Now.Year GrapheneTrace Demo
     </footer>
 
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="~/js/charts.js" asp-append-version="true"></script>
+    <script src="~/js/heatmap.js" asp-append-version="true"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 
