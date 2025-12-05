@@ -15,43 +15,43 @@
                     </h1>
                     <p class="text-muted mb-0">
                         Review pressure mapping trends, spot high-risk sessions, and drill into individual
-                        patients’ heatmaps. All metrics are computed from the same sensor data used in
-                        the patient view.
+                        patients’ heatmaps. All metrics are computed from the same sensor data used in the
+                        patient view.
                     </p>
                     <div class="mt-3 small text-muted">
-                        <i class="bi bi-people me-1"></i> Multi-patient oversight
+                        <i class="bi bi-people-fill me-1"></i> Multi-patient oversight
                         <span class="mx-2">•</span>
-                        <i class="bi bi-bell me-1"></i> High-risk flags
+                        <i class="bi bi-bell-fill me-1"></i> High-risk flags
                     </div>
                 </div>
 
                 <div class="text-md-end small text-muted">
                     <div class="mb-2">
-                        <div class="text-uppercase" style="letter-spacing:.12em;">Select patient</div>
-                        <select id="clinPatientSelect"
+                        <span class="text-uppercase" style="letter-spacing:.12em;">Select patient</span><br />
+                        <select id="clinPatient"
                                 class="form-select form-select-sm mt-1"
-                                style="min-width:210px;">
-                            <option value="">Choose patient...</option>
+                                style="min-width: 220px;">
+                            <option value="">Choose patient…</option>
                         </select>
                     </div>
 
-                    <div>
-                        <div class="text-uppercase mb-1" style="letter-spacing:.12em;">Time window</div>
-                        <div class="btn-group btn-group-sm" role="group">
+                    <div class="mt-3">
+                        <span class="text-uppercase" style="letter-spacing:.12em;">Time window</span><br />
+                        <div class="btn-group mt-1" role="group" aria-label="Time window">
                             <button type="button"
-                                    class="btn btn-outline-secondary active"
+                                    class="btn btn-outline-secondary btn-sm"
+                                    data-clin-range="1">
+                                Last 1h
+                            </button>
+                            <button type="button"
+                                    class="btn btn-outline-secondary btn-sm"
+                                    data-clin-range="6">
+                                Last 6h
+                            </button>
+                            <button type="button"
+                                    class="btn btn-outline-secondary btn-sm active"
                                     data-clin-range="24">
                                 Last 24h
-                            </button>
-                            <button type="button"
-                                    class="btn btn-outline-secondary"
-                                    data-clin-range="72">
-                                3 days
-                            </button>
-                            <button type="button"
-                                    class="btn btn-outline-secondary"
-                                    data-clin-range="all">
-                                All
                             </button>
                         </div>
                     </div>
@@ -60,7 +60,7 @@
         </div>
     </section>
 
-    <!-- TREND + HEATMAP -->
+    <!-- TREND + HEATMAP ROW -->
     <section class="mb-4">
         <div class="row g-3">
             <!-- Trend overview -->
@@ -72,19 +72,20 @@
                             <div class="fw-semibold">Select a patient to view their sessions</div>
                         </div>
                     </div>
+
                     <div class="card-body">
                         <div class="ratio ratio-16x9">
                             <canvas id="clinTrendChart"></canvas>
                         </div>
                         <p class="small text-muted mt-3 mb-0">
-                            Blue: <span class="fw-semibold">Peak Pressure Index</span> (max sensor pressure per session).
+                            Blue: <span class="fw-semibold">Peak Pressure Index</span> (max sensor pressure per session).<br />
                             Green: <span class="fw-semibold">Contact Area %</span> (percentage of sensors above load threshold).
                         </p>
                     </div>
                 </div>
             </div>
 
-            <!-- Heatmap -->
+            <!-- Heatmap card -->
             <div class="col-lg-5">
                 <div class="card heatmap-card shadow-sm h-100">
                     <div class="card-header fw-semibold d-flex align-items-center gap-2">
@@ -92,11 +93,11 @@
                         <span>Pressure Map</span>
 
                         <div class="ms-auto d-flex flex-wrap gap-2 align-items-center">
-                            <select id="clinHmDate" class="form-select form-select-sm" style="min-width:140px;">
-                                <option value="">Date...</option>
+                            <select id="clinDate" class="form-select form-select-sm" style="min-width: 140px;">
+                                <option value="">Date…</option>
                             </select>
 
-                            <select id="clinHmPalette" class="form-select form-select-sm">
+                            <select id="clinPalette" class="form-select form-select-sm">
                                 <option value="default">Default Palette</option>
                                 <option value="warm">Warm Gradient</option>
                                 <option value="cool">Cool Gradient</option>
@@ -110,26 +111,38 @@
                             <canvas id="clinHeatmapCanvas"></canvas>
                         </div>
 
-                        <!-- KPI row under heatmap -->
+                        <!-- KPI row -->
                         <div class="d-flex flex-wrap justify-content-between gap-3 px-3 pt-3 pb-2 small">
                             <div>
                                 <div class="text-muted text-uppercase" style="font-size:.7rem;letter-spacing:.12em;">
                                     Peak Pressure Index
                                 </div>
-                                <div id="clinHmPpi" class="fw-bold">—</div>
+                                <div id="clinKpiPpi" class="fw-bold">—</div>
                             </div>
                             <div>
                                 <div class="text-muted text-uppercase" style="font-size:.7rem;letter-spacing:.12em;">
                                     Contact Area %
                                 </div>
-                                <div id="clinHmContact" class="fw-bold">—</div>
+                                <div id="clinKpiContact" class="fw-bold">—</div>
                             </div>
                             <div>
                                 <div class="text-muted text-uppercase" style="font-size:.7rem;letter-spacing:.12em;">
                                     Status
                                 </div>
-                                <div id="clinHmStatus" class="fw-bold">—</div>
+                                <div id="clinKpiStatus" class="fw-bold">—</div>
                             </div>
+                        </div>
+
+                        <!-- Playback controls -->
+                        <div class="px-3 pb-3 d-flex align-items-center gap-3">
+                            <button id="clinHmBtnPlay" class="btn btn-sm btn-outline-light rounded-circle">
+                                <i class="bi bi-play-fill"></i>
+                            </button>
+                            <input id="clinHmFrameSlider"
+                                   type="range"
+                                   class="form-range flex-grow-1"
+                                   min="0" max="0" value="0" />
+                            <small id="clinHmFrameTime" class="text-muted">0.0s / 0.0s</small>
                         </div>
 
                         <div class="px-3 pb-3 small text-muted" id="clinHmStatusText">
@@ -145,35 +158,65 @@
         </div>
     </section>
 
-    <!-- Lower panels (risk flags / notes) – keep your existing content here if you have it -->
+    <!-- RISK FLAGS + CLINICIAN NOTES -->
     <section class="mb-4">
         <div class="row g-3">
+            <!-- Risk flags -->
             <div class="col-lg-6">
-                <div class="card">
-                    <div class="card-header">
-                        <span class="fw-semibold">Risk flags</span>
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Risk flags</span>
                     </div>
-                    <div class="card-body small text-muted">
-                        Select a patient to see recent high-risk sessions.
+                    <div class="card-body">
+                        <div id="clinRiskEmpty" class="text-muted small">
+                            Select a patient to see their recent high-risk sessions.
+                        </div>
+
+                        <ul id="clinRiskList"
+                            class="list-group list-group-flush d-none">
+                            <!-- Filled by JS -->
+                        </ul>
                     </div>
                 </div>
             </div>
 
+            <!-- Clinician notes -->
             <div class="col-lg-6">
-                <div class="card">
-                    <div class="card-header fw-semibold">Clinician notes</div>
-                    <div class="card-body small text-muted">
-                        Use this space to record your observations for each patient’s pressure profile,
-                        including posture advice and follow-up actions.
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Clinician notes</span>
+                    </div>
+
+                    <div class="card-body d-flex flex-column">
+                        <!-- Thread -->
+                        <div id="clinNotesThread"
+                             class="mb-3 small"
+                             style="max-height: 260px; overflow-y: auto;">
+                            <div class="text-muted">
+                                Select a patient to view or add notes.
+                            </div>
+                        </div>
+
+                        <!-- Input -->
+                        <div class="input-group mt-auto">
+                            <input id="clinNoteInput"
+                                   type="text"
+                                   class="form-control"
+                                   placeholder="Add a note about this patient..." />
+                            <button id="clinNoteSend"
+                                    class="btn btn-primary">
+                                <i class="bi bi-send"></i>
+                                <span class="ms-1">Send</span>
+                            </button>
+                        </div>
+
+                        <small id="clinNotesStatus"
+                               class="text-muted mt-2">
+                            Notes are stored in this browser only (demo only).
+                        </small>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 </div>
-
-@section Scripts {
-    <!-- Page-specific helpers for charts + heatmap -->
-    <script src="~/js/charts.js" asp-append-version="true"></script>
-    <script src="~/js/heatmap.js" asp-append-version="true"></script>
-}

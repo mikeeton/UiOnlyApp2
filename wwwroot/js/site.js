@@ -68,7 +68,7 @@
     const sessionCache = {}; // { patientId: { dateKey: { frames, ppi, contactPct, alert } } }
 
     // -----------------------------
-    // 1) CSV helpers
+    // 1) CSV + metrics helpers
     // -----------------------------
 
     function parseCsvToFrames(csvText, maxFrames) {
@@ -89,7 +89,7 @@
         for (let f = 0; f < totalFrames; f++) {
             const flat = [];
             for (let r = 0; r < ROWS_PER_FRAME; r++) {
-                const line = lines[f * ROWS_PER_FRAME + r] || "";
+                const line = lines[f * ROWS_PER_FRAME + r];
                 const parts = line.split(/[,;\s]+/).filter(p => p.length > 0);
 
                 for (let c = 0; c < COLS_PER_FRAME; c++) {
@@ -164,7 +164,103 @@
     }
 
     // -----------------------------
-    // 2) Data loading (per patient)
+    // 2) Notes + risk flags helpers
+    // -----------------------------
+    const NOTES_STORAGE_KEY = "sensoreClinicianNotes";
+
+    function loadAllNotes() {
+        try {
+            const raw = localStorage.getItem(NOTES_STORAGE_KEY);
+            return raw ? JSON.parse(raw) : {};
+        } catch {
+            return {};
+        }
+    }
+
+    function saveAllNotes(notesObj) {
+        try {
+            localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notesObj));
+        } catch {
+            // ignore
+        }
+    }
+
+    function renderRiskFlags(sessions, patientName) {
+        const emptyEl = document.getElementById("clinRiskEmpty");
+        const listEl = document.getElementById("clinRiskList");
+        if (!emptyEl || !listEl) return;
+
+        listEl.innerHTML = "";
+
+        const entries = Object.entries(sessions)
+            .filter(([date, s]) => s.alert && s.alert.label === "High risk")
+            .sort(([d1], [d2]) => d1.localeCompare(d2));
+
+        if (!entries.length) {
+            emptyEl.classList.remove("d-none");
+            listEl.classList.add("d-none");
+            emptyEl.textContent = "No recent High risk sessions for this patient.";
+            return;
+        }
+
+        emptyEl.classList.add("d-none");
+        listEl.classList.remove("d-none");
+
+        const latest = entries.slice(-5); // last 5 high-risk
+
+        for (const [date, s] of latest) {
+            const li = document.createElement("li");
+            li.className = "list-group-item bg-transparent border-secondary text-light small d-flex justify-content-between align-items-center";
+
+            li.innerHTML = `
+                <div>
+                    <div class="fw-semibold">${date}</div>
+                    <div class="text-muted">
+                        PPI: ${s.ppi.toFixed(0)} • Contact: ${s.contactPct.toFixed(1)}%
+                    </div>
+                </div>
+                <span class="badge bg-danger rounded-pill">High risk</span>
+            `;
+            listEl.appendChild(li);
+        }
+    }
+
+    function renderClinicianNotes(patientId) {
+        const threadEl = document.getElementById("clinNotesThread");
+        if (!threadEl) return;
+
+        const notesAll = loadAllNotes();
+        const notes = notesAll[patientId] || [];
+
+        threadEl.innerHTML = "";
+
+        if (!patientId) {
+            threadEl.innerHTML = `<div class="text-muted">Select a patient to view or add notes.</div>`;
+            return;
+        }
+
+        if (!notes.length) {
+            threadEl.innerHTML = `<div class="text-muted">No notes for this patient yet. Add one below.</div>`;
+            return;
+        }
+
+        for (const note of notes) {
+            const dt = new Date(note.ts);
+            const timeLabel = dt.toLocaleString();
+
+            const div = document.createElement("div");
+            div.className = "mb-2";
+
+            div.innerHTML = `
+                <div class="fw-semibold">Dr. Patel <span class="text-muted small">• ${timeLabel}</span></div>
+                <div>${note.text}</div>
+            `;
+            threadEl.appendChild(div);
+        }
+    }
+
+    // -----------------------------
+    // 3) Data loading (per patient)
     // -----------------------------
 
     async function loadSessionsForPatient(patientId) {
@@ -208,7 +304,7 @@
     }
 
     // -----------------------------
-    // 3) HeatmapPlayer helper (used by patient + clinician)
+    // 4) HeatmapPlayer helper
     // -----------------------------
 
     function HeatmapPlayer(opts) {
@@ -220,9 +316,9 @@
         this.kpiStatus = document.getElementById(opts.kpiStatusId);
         this.statusText = document.getElementById(opts.statusTextId);
         this.caption = document.getElementById(opts.captionId);
-        this.playButton = opts.playBtnId ? document.getElementById(opts.playBtnId) : null;
-        this.slider = opts.sliderId ? document.getElementById(opts.sliderId) : null;
-        this.timeLabel = opts.timeLabelId ? document.getElementById(opts.timeLabelId) : null;
+        this.playButton = document.getElementById(opts.playBtnId);
+        this.slider = document.getElementById(opts.sliderId);
+        this.timeLabel = document.getElementById(opts.timeLabelId);
 
         this.currentFrames = [];
         this.currentDateKey = null;
@@ -247,7 +343,7 @@
     HeatmapPlayer.prototype.renderFrame = function (index) {
         if (!this.canvas || !this.currentFrames.length) return;
         const frame = this.currentFrames[index];
-        const palName = mapPalette(this.paletteSelect ? this.paletteSelect.value : "default");
+        const palName = mapPalette(this.paletteSelect.value);
 
         if (window.HeatmapSim && typeof HeatmapSim.drawHeatmap === "function") {
             HeatmapSim.drawHeatmap(this.canvas, frame, palName);
@@ -398,7 +494,7 @@
     };
 
     // -----------------------------
-    // 4) Patient dashboard init
+    // 5) Patient dashboard init
     // -----------------------------
 
     async function initPatientDashboard() {
@@ -484,7 +580,7 @@
             });
         }
 
-        // Heatmap player for patient (with video controls)
+        // Heatmap player for patient
         const player = new HeatmapPlayer({
             canvasId: "heatmapCanvas",
             dateSelectId: "hmDate",
@@ -508,21 +604,20 @@
     }
 
     // -----------------------------
-    // 5) Clinician dashboard init
+    // 6) Clinician dashboard init
     // -----------------------------
 
     async function initClinicianDashboard() {
-        // IDs as used in Clinician.cshtml
-        const selPatient = document.getElementById("clinPatientSelect");
-        const selDate = document.getElementById("clinHmDate");
-        const selPalette = document.getElementById("clinHmPalette");
+        const selPatient = document.getElementById("clinPatient");
+        const selDate = document.getElementById("clinDate");
+        const selPalette = document.getElementById("clinPalette");
         const trendCanvas = document.getElementById("clinTrendChart");
         const statusEl = document.getElementById("clinHmStatusText");
 
         if (!selPatient || !selDate || !trendCanvas) return;
 
         // populate patient list
-        selPatient.innerHTML = '<option value="">Choose patient...</option>';
+        selPatient.innerHTML = '<option value="">Choose patient…</option>';
         for (const [id, meta] of Object.entries(SENSOR_INDEX.patients)) {
             const opt = document.createElement("option");
             opt.value = id;
@@ -531,20 +626,26 @@
         }
 
         let currentPatientId = null;
+        let currentSessions = {};
+        let currentTrendChart = null;
 
-        // Heatmap player wired to clinician IDs (no playback controls)
+        // notes controls
+        const noteInput = document.getElementById("clinNoteInput");
+        const noteSendBtn = document.getElementById("clinNoteSend");
+
+        // Heatmap player wired to clinician IDs
         const player = new HeatmapPlayer({
             canvasId: "clinHeatmapCanvas",
-            dateSelectId: "clinHmDate",
-            paletteSelectId: "clinHmPalette",
-            kpiPpiId: "clinHmPpi",
-            kpiContactId: "clinHmContact",
-            kpiStatusId: "clinHmStatus",
+            dateSelectId: "clinDate",
+            paletteSelectId: "clinPalette",
+            kpiPpiId: "clinKpiPpi",
+            kpiContactId: "clinKpiContact",
+            kpiStatusId: "clinKpiStatus",
             statusTextId: "clinHmStatusText",
             captionId: "clinHmSessionCaption",
-            playBtnId: null,
-            sliderId: null,
-            timeLabelId: null,
+            playBtnId: "clinHmBtnPlay",
+            sliderId: "clinHmFrameSlider",
+            timeLabelId: "clinHmFrameTime",
             sessions: {},
             patientName: ""
         });
@@ -555,21 +656,27 @@
             const id = selPatient.value;
             player.destroyTimer();
             player.sessions = {};
-            currentPatientId = null;
+            currentSessions = {};
+            currentPatientId = id;
+
+            renderRiskFlags({}, "");
+            renderClinicianNotes(null);
 
             if (!id) {
                 if (statusEl) statusEl.textContent = "Select a patient and date to load a session heatmap.";
-                selDate.innerHTML = '<option value="">Date...</option>';
-                const ctx = trendCanvas.getContext("2d");
-                ctx.clearRect(0, 0, trendCanvas.width, trendCanvas.height);
+                selDate.innerHTML = '<option value="">Date…</option>';
+                if (trendCanvas) {
+                    const ctx = trendCanvas.getContext("2d");
+                    ctx.clearRect(0, 0, trendCanvas.width, trendCanvas.height);
+                }
                 return;
             }
 
-            currentPatientId = id;
             const meta = SENSOR_INDEX.patients[id];
             if (statusEl) statusEl.textContent = `Loading sessions for ${meta.name}…`;
 
             const sessions = await loadSessionsForPatient(id);
+            currentSessions = sessions;
             player.sessions = sessions;
             player.patientName = meta.name;
 
@@ -584,6 +691,8 @@
             if (!dates.length) {
                 selDate.innerHTML = '<option value="">No sessions</option>';
                 if (statusEl) statusEl.textContent = "No sessions for this patient.";
+                renderRiskFlags({}, meta.name);
+                renderClinicianNotes(id);
                 return;
             }
             selDate.value = dates[dates.length - 1];
@@ -594,8 +703,12 @@
                 const ppiSeries = labels.map(d => sessions[d].ppi);
                 const contactSeries = labels.map(d => sessions[d].contactPct);
 
-                const trendChart = Charts.mkCompareChart(
-                    trendCanvas.getContext("2d"),
+                const ctx = trendCanvas.getContext("2d");
+                if (currentTrendChart) {
+                    currentTrendChart.destroy();
+                }
+                currentTrendChart = Charts.mkCompareChart(
+                    ctx,
                     labels,
                     ppiSeries,
                     contactSeries,
@@ -619,13 +732,17 @@
                         const subPpi = ppiSeries.slice(-count);
                         const subContact = contactSeries.slice(-count);
 
-                        trendChart.data.labels = subLabels;
-                        trendChart.data.datasets[0].data = subPpi;
-                        trendChart.data.datasets[1].data = subContact;
-                        trendChart.update();
+                        currentTrendChart.data.labels = subLabels;
+                        currentTrendChart.data.datasets[0].data = subPpi;
+                        currentTrendChart.data.datasets[1].data = subContact;
+                        currentTrendChart.update();
                     });
                 });
             }
+
+            // Risk flags + notes for this patient
+            renderRiskFlags(currentSessions, meta.name);
+            renderClinicianNotes(id);
 
             if (statusEl) statusEl.textContent = "Select a date to view the session heatmap.";
             player.setSession(selDate.value);
@@ -640,14 +757,43 @@
 
         if (selPalette) {
             selPalette.addEventListener("change", () => {
-                if (!player.currentFrames.length) return;
-                player.renderFrame(0);
+                if (!player.currentFrames.length || !player.slider) return;
+                const idx = Number(player.slider.value);
+                player.renderFrame(idx);
+            });
+        }
+
+        // notes send handler
+        if (noteSendBtn && noteInput) {
+            noteSendBtn.addEventListener("click", () => {
+                const text = noteInput.value.trim();
+                if (!text || !currentPatientId) return;
+
+                const all = loadAllNotes();
+                if (!all[currentPatientId]) all[currentPatientId] = [];
+
+                all[currentPatientId].push({
+                    text,
+                    ts: Date.now()
+                });
+
+                saveAllNotes(all);
+                noteInput.value = "";
+                renderClinicianNotes(currentPatientId);
+            });
+
+            // Optional: send on Enter
+            noteInput.addEventListener("keydown", e => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    noteSendBtn.click();
+                }
             });
         }
     }
 
     // -----------------------------
-    // 6) Entry point
+    // 7) Entry point
     // -----------------------------
     document.addEventListener("DOMContentLoaded", function () {
         // Patient dashboard (Index)
